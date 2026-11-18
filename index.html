@@ -207,7 +207,7 @@ dl.kv dd { margin: 0; overflow-wrap: anywhere; }
     </section>
     <section class="panel" aria-labelledby="ch-title">
       <h2 id="ch-title">적용 위치별 증착 온도</h2>
-      <div class="legend"><span>점 하나가 공정 하나</span><span>점선 100 °C</span><span class="sub" id="chart-note"></span></div>
+      <div class="legend"><span>점 하나가 공정 하나</span><span>점선 100 °C</span></div>
       <div class="chart-wrap" id="chart"></div>
     </section>
   </div>
@@ -366,8 +366,6 @@ function renderChart(rows) {
   const H = top + positions.length * rowH + bottom;
   const xMax = 350, x = (t) => left + (t / xMax) * (W - left - right);
   const pts = rows.filter((r) => typeof r.temp_C === "number");
-  const missing = rows.length - pts.length;
-  $("chart-note").textContent = missing ? `온도 미보고 ${missing}건은 표시 안 함` : "";
   let s = `<svg class="strip" viewBox="0 0 ${W} ${H}" role="img" aria-label="적용 위치별 ALD 증착 온도 분포">`;
   s += '<g class="grid tick">';
   for (let t = 0; t <= xMax; t += 50) {
