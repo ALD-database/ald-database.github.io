@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REACT ALD 공정 DB</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Plan: lab-notebook utility. Cool slate neutrals biased to cobalt, one cobalt accent,
+   PSC = blue / FE = orange identity chips.
+   Layout: header summary → filter bar → [periodic-table picker | temperature window chart] → sortable table → detail drawer. */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #eef1f5;
+  --ink: #12161d;
+  --ink-2: #4a5260;
+  --ink-3: #6b7383;
+  --line: #d9dee6;
+  --accent: #2346b8;
+  --accent-soft: #e3e9fb;
+  --psc: #2a78d6;
+  --fe: #eb6834;
+  --good: #0a7d2c;
+  --good-bg: #e2f3e6;
+  --warn: #8a5a00;
+  --warn-bg: #fdf0d2;
+  --serious: #b0431b;
+  --serious-bg: #fbe5dc;
+  --dot: #2346b8;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1218; --surface: #171b23; --surface-2: #1f2430; --ink: #eceff4; --ink-2: #b6bdca; --ink-3: #8c94a3;
+    --line: #2c3341; --accent: #8aa6ff; --accent-soft: #23305a; --psc: #3987e5; --fe: #d95926;
+    --good: #5fd27d; --good-bg: #173322; --warn: #f2c14e; --warn-bg: #3a2e12; --serious: #f0906a; --serious-bg: #3d2219;
+    --dot: #8aa6ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1218; --surface: #171b23; --surface-2: #1f2430; --ink: #eceff4; --ink-2: #b6bdca; --ink-3: #8c94a3;
+  --line: #2c3341; --accent: #8aa6ff; --accent-soft: #23305a; --psc: #3987e5; --fe: #d95926;
+  --good: #5fd27d; --good-bg: #173322; --warn: #f2c14e; --warn-bg: #3a2e12; --serious: #f0906a; --serious-bg: #3d2219;
+  --dot: #8aa6ff; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 20px 48px; display: grid; gap: 20px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 16px; font-weight: 600; }
+.mono, .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+a { color: var(--accent); }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* header */
+header { display: grid; gap: 14px; }
+.eyebrow { font-size: 13px; color: var(--ink-3); }
+.stats { display: flex; flex-wrap: wrap; gap: 10px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; display: grid; }
+.stat b { font-family: var(--font-mono); font-size: 20px; font-weight: 500; }
+.stat span { font-size: 12px; color: var(--ink-3); }
+
+/* filters */
+.filters { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: end; }
+.ctl { display: grid; gap: 4px; }
+.ctl label, .ctl .lbl { font-size: 12px; color: var(--ink-3); }
+.ctl input[type="search"] { width: 240px; }
+input[type="search"], input[type="number"], select { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; height: 34px; }
+input[type="number"] { width: 78px; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; height: 34px; }
+.seg button { border: 0; background: var(--surface); padding: 0 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--line); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #fff; }
+:root[data-theme="dark"] .seg button[aria-pressed="true"] { color: #0f1218; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .seg button[aria-pressed="true"] { color: #0f1218; } }
+.checks { display: flex; gap: 10px; align-items: center; height: 34px; font-size: 13px; }
+.checks label { display: inline-flex; gap: 4px; align-items: center; cursor: pointer; color: var(--ink-2); }
+.btn { border: 1px solid var(--line); background: var(--surface-2); border-radius: 6px; height: 34px; padding: 0 12px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+
+/* overview row */
+.overview { display: grid; grid-template-columns: minmax(0, 540px) minmax(0, 1fr); gap: 20px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.panel p.note { margin: 0; font-size: 12.5px; color: var(--ink-3); }
+.ptable { display: grid; grid-template-columns: repeat(18, minmax(0, 1fr)); gap: 3px; }
+.el { aspect-ratio: 1; border-radius: 4px; display: grid; place-items: center; font-size: 11px; color: var(--ink-3); background: var(--surface-2); border: 1px solid transparent; position: relative; padding: 0; }
+.el.has { background: var(--accent-soft); color: var(--ink); font-weight: 600; cursor: pointer; border-color: var(--line); }
+.el.has:hover { border-color: var(--accent); }
+.el.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+:root[data-theme="dark"] .el.on { color: #0f1218; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .el.on { color: #0f1218; } }
+.el sup { position: absolute; top: 1px; right: 3px; font-size: 8.5px; font-weight: 500; font-family: var(--font-mono); }
+.chart-wrap { position: relative; overflow-x: auto; }
+svg.strip { display: block; width: 100%; min-width: 520px; height: auto; }
+svg.strip text { fill: var(--ink-2); font-family: var(--font-body); font-size: 12px; }
+svg.strip .tick text { fill: var(--ink-3); font-family: var(--font-mono); font-size: 11px; }
+svg.strip .grid line { stroke: var(--line); }
+svg.strip .ref line { stroke: var(--ink-3); stroke-dasharray: 3 3; }
+svg.strip .ref text { fill: var(--ink-3); font-size: 11px; }
+svg.strip circle.pt { fill: var(--dot); stroke: var(--surface); stroke-width: 2; cursor: pointer; }
+svg.strip circle.hit { fill: transparent; cursor: pointer; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--ink-2); flex-wrap: wrap; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); padding: 6px 9px; border-radius: 6px; font-size: 12px; line-height: 1.4; max-width: 260px; opacity: 0; transition: opacity .1s; z-index: 5; }
+
+/* table */
+.results { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.results-head { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; gap: 10px; flex-wrap: wrap; border-bottom: 1px solid var(--line); }
+.results-head .count { color: var(--ink-2); font-size: 13px; }
+.tbl-scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; min-width: 1100px; font-size: 13.5px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; font-weight: 600; color: var(--ink-3); background: var(--surface); position: sticky; top: 0; white-space: nowrap; }
+th[data-sort] { cursor: pointer; }
+td.doi { font-size: 12px; max-width: 190px; word-break: break-all; }
+th[data-sort]:hover { color: var(--ink); }
+th .arr { font-family: var(--font-mono); }
+td.num { text-align: right; white-space: nowrap; }
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--surface-2); }
+tbody tr:focus-visible { outline-offset: -2px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; color: var(--ink-2); }
+.chip::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--psc); }
+.chip.fe::before { background: var(--fe); }
+.sub { color: var(--ink-3); font-size: 12px; }
+.empty { padding: 28px 16px; color: var(--ink-2); }
+
+/* drawer */
+.scrim { position: fixed; inset: 0; background: rgba(10, 14, 20, .38); opacity: 0; pointer-events: none; transition: opacity .15s; z-index: 20; }
+.scrim.open { opacity: 1; pointer-events: auto; }
+aside.drawer { position: fixed; top: 0; right: 0; height: 100%; width: min(560px, 100%); background: var(--surface); border-left: 1px solid var(--line); z-index: 21; transform: translateX(100%); transition: transform .18s ease; overflow-y: auto; padding: 22px 22px 40px; display: grid; gap: 18px; align-content: start; }
+aside.drawer.open { transform: none; }
+@media (prefers-reduced-motion: reduce) { aside.drawer, .scrim, .tip { transition: none; } }
+.drawer-top { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
+.drawer h3 { font-size: 20px; }
+.drawer section { display: grid; gap: 8px; }
+.drawer h4 { margin: 0; font-size: 12px; color: var(--ink-3); font-weight: 600; }
+dl.kv { display: grid; grid-template-columns: 120px 1fr; gap: 6px 12px; margin: 0; font-size: 14px; }
+dl.kv dt { color: var(--ink-3); }
+dl.kv dd { margin: 0; overflow-wrap: anywhere; }
+.finding { background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin: 0; }
+
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: 8px 14px; border-radius: 6px; font-size: 13px; opacity: 0; transition: opacity .15s; z-index: 30; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 960px) {
+  .overview { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .wrap { padding: 16px 16px 40px; }
+  .ctl input[type="search"] { width: 100%; }
+  .ctl.grow { flex: 1 1 100%; }
+  dl.kv { grid-template-columns: 96px 1fr; }
+  .el { font-size: 9px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">화학생명공학과 AI 활용 발표회 · 팀 REACT · 지도교수 박혜진</div>
+    <h1>페로브스카이트·강유전체 ALD 공정 데이터베이스</h1>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <div class="filters" role="search">
+    <div class="ctl grow">
+      <label for="q">검색</label>
+      <input id="q" type="search" placeholder="재료, 전구체, 계면, 키워드 (예: TDMASn, HZO, C60)">
+    </div>
+    <div class="ctl">
+      <span class="lbl" id="field-lbl">분야</span>
+      <div class="seg" role="group" aria-labelledby="field-lbl" id="field-seg">
+        <button type="button" data-v="all" aria-pressed="true">전체</button>
+        <button type="button" data-v="PSC" aria-pressed="false">태양전지</button>
+        <button type="button" data-v="FE" aria-pressed="false">강유전체</button>
+      </div>
+    </div>
+    <div class="ctl"><label for="pos">적용 위치</label><select id="pos"></select></div>
+    <div class="ctl"><label for="prec">전구체</label><select id="prec"></select></div>
+    <div class="ctl"><label for="co">반응물</label><select id="co"></select></div>
+    <div class="ctl"><label for="mode">ALD 방식</label><select id="mode"></select></div>
+    <div class="ctl">
+      <span class="lbl">증착 온도 (°C)</span>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="tmin" type="number" min="0" max="500" step="5" placeholder="최소" aria-label="최소 온도">
+        <span class="sub">–</span>
+        <input id="tmax" type="number" min="0" max="500" step="5" placeholder="최대" aria-label="최대 온도">
+      </div>
+    </div>
+    <button class="btn" type="button" id="reset">필터 초기화</button>
+  </div>
+
+  <div class="overview">
+    <section class="panel" aria-labelledby="pt-title">
+      <h2 id="pt-title">원소로 찾기</h2>
+      <div class="ptable" id="ptable"></div>
+      <p class="note">ALD 막에 들어간 금속·도펀트 원소다. 숫자는 레코드 수이고, 여러 원소를 고르면 모두 포함한 공정만 남는다.</p>
+    </section>
+    <section class="panel" aria-labelledby="ch-title">
+      <h2 id="ch-title">적용 위치별 증착 온도</h2>
+      <div class="legend"><span>점 하나가 공정 하나</span><span>점선 100 °C</span><span class="sub" id="chart-note"></span></div>
+      <div class="chart-wrap" id="chart"></div>
+    </section>
+  </div>
+
+  <section class="results" aria-labelledby="res-title">
+    <div class="results-head">
+      <h2 id="res-title">공정 목록 <span class="count" id="count"></span></h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn" type="button" id="copy-csv">CSV 복사</button>
+        <button class="btn" type="button" id="copy-json">JSON 복사</button>
+      </div>
+    </div>
+    <div class="tbl-scroll">
+      <table>
+        <thead><tr>
+          <th data-sort="id">ID <span class="arr"></span></th>
+          <th>재료</th>
+          <th>전구체 / 반응물</th>
+          <th>방식</th>
+          <th data-sort="temp_C" class="num">온도 °C <span class="arr"></span></th>
+          <th data-sort="thickness_nm" class="num">두께 nm <span class="arr"></span></th>
+          <th data-sort="gpc_A" class="num">GPC Å/cyc <span class="arr"></span></th>
+          <th>적용 위치</th>
+          <th data-sort="perf">성능 <span class="arr"></span></th>
+          <th>출처 (DOI)</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>조건에 맞는 공정이 없다. 필터를 줄이거나 초기화한다.</div>
+  </section>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="d-title" role="dialog"></aside>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tip" id="tip"></div>
+
+<script>
+const RECORDS = [{"id": "PSC-001", "field": "PSC", "material": "Al2O3", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 75, "temp_note": "25·75·125 °C 비교, 75 °C 최적", "cycles": 10, "cycle_note": "5·10·20 사이클 비교, 10 사이클 최적; 두께 0.1 nm는 XPS 감쇠로 구한 등가 두께(약 1 Å)", "thickness_nm": 0.1, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트/PCBM 계면", "device_stack": "FTO/NiOx/MAPbI3/ALD-Al2O3/PCBM/PPDIN6/Ag", "psc": {"architecture": "p-i-n", "pce_pct": 20.4, "pce_ref_pct": 19.2, "stability": "N2 글로브박스 150일 보관: 정규화 PCE 95.3% 유지 (대조군 92.7%)"}, "fe": null, "key_finding": "페로브스카이트 위 ALD Al2O3의 증착 온도와 사이클 수를 체계적으로 바꿔 75 °C·10사이클(등가 두께 약 1 Å)을 최적 패시베이션 조건으로 찾았다.", "source": {"doi": "10.1039/d1na00075f"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-002", "field": "PSC", "material": "Al2O3", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": null, "temp_note": "상온(room temperature)으로 보고", "cycles": 14, "cycle_note": "Si 웨이퍼 600사이클로 GPC 보정", "thickness_nm": 0.75, "gpc_A": 0.57, "position": "passivation", "position_note": "페로브스카이트/spiro-OMeTAD 계면", "device_stack": "glass/ITO/SnO2/CsMAFA/ALD-Al2O3(0.75 nm)/spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 20.5, "pce_ref_pct": 19.1, "stability": "실외 1500 h(ISOS-O-2): 초기 PCE 98% 유지(대조군 <10%); N2 보관 180일 85% 유지"}, "fe": null, "key_finding": "0.75 nm ALD-Al2O3가 이온 이동과 spiro-OMeTAD 열화 부산물의 확산을 양방향으로 막는 장벽으로 작동하고, 페로브스카이트의 비정질화를 억제한다.", "source": {"doi": "10.1039/d4ee05703a"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-003", "field": "PSC", "material": "Al2O3", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "챔버 온도; 기존 한계는 75 °C로 기술", "cycles": 10, "cycle_note": "5-AVAI(5-ammonium valeric acid iodide) 표면처리 후 증착", "thickness_nm": 1.1, "gpc_A": null, "position": "passivation", "position_note": "광대역 상부셀 5-AVAI 처리층/C60 계면", "device_stack": "ITO/NiOx/Me-4PACz/WBG perovskite(1.78 eV)/5-AVAI/ALD-Al2O3/C60/ALD-SnOx/Au(1 nm)/PEDOT:PSS/NBG perovskite/C60/BCP/Ag", "psc": {"architecture": "tandem", "pce_pct": 27.1, "pce_ref_pct": null, "stability": "단일접합(봉지) 25 °C 연속 1 sun MPPT 615 h 99% → 55 °C 1000 h 90%; 탠덤 25 °C 500 h 90% 유지"}, "fe": null, "key_finding": "5-AVAI의 카복실기가 ALD 핵생성 자리를 제공해 100 °C에서도 균일하고 치밀한 Al2O3 이온 이동 장벽을 형성했다(전 페로브스카이트 탠덤 27.1%).", "source": {"doi": "10.1016/j.joule.2024.12.002"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-004", "field": "PSC", "material": "AlOx", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 90, "temp_note": "기판 온도", "cycles": 8, "cycle_note": "TMA·H2O 각각 펄스 0.2 s / 퍼지 8.0 s; 이후 PDAI2 스핀코팅", "thickness_nm": 1.0, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트/PDAI2·C60 계면", "device_stack": "Si 하부셀/NiOx/Ph-4PACz/perovskite/AlOx/PDAI2/C60/SnO2(ALD)/IZO/Ag", "psc": {"architecture": "tandem", "pce_pct": 31.6, "pce_ref_pct": null, "stability": "ISOS-D-2I(85 °C, 암조건) 1000 h 92% (LiF 대조군 74.5%); ISOS-L-1I MPPT 1000 h 95%"}, "fe": null, "key_finding": "약 1 nm ALD-AlOx와 PDAI2 이중 패시베이션으로 산업용 Si 하부셀 탠덤에서 31.6%(공인 30.8%)를 얻었다(AlOx 단독 29.3%).", "source": {"doi": "10.1038/s41467-025-64467-y"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-005", "field": "PSC", "material": "AlOx", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 25, "temp_note": "기판 상온(25 °C), TMA·H2O 소스 25 °C", "cycles": 10, "cycle_note": "TMA 0.2 s/퍼지 30 s, H2O 0.01 s/퍼지 35 s; 0·5·10·15 사이클 비교(10 최적)", "thickness_nm": 1.0, "gpc_A": null, "position": "passivation", "position_note": "광대역 페로브스카이트/C60 계면", "device_stack": "ITO/MeO-2PACz/WBG perovskite(1.66 eV)/ALD-AlOx/C60/SnO2/Ag; 페로브스카이트/Si 탠덤", "psc": {"architecture": "p-i-n", "pce_pct": 21.8, "pce_ref_pct": 19.32, "stability": "비봉지 단일접합: N2 3500 h >97% (대조 54%), 35±5% RH 1300 h 이상 약 90% (대조 43%), LED 광조사 1560 h >87% (대조 57%), 65 °C N2 광조사 672 h 78% (대조 38%); 탠덤 800 h >90%"}, "fe": null, "key_finding": "ALD-AlOx의 Al3+가 페로브스카이트 표면·입계로 침투해 이온 이동과 상분리를 억제했다(탠덤 28.50%).", "source": {"doi": "10.1002/anie.202407766"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-006", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O2"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "TDMASn 50 °C 가열", "cycles": 84, "cycle_note": "H2O 산화제와 비교", "thickness_nm": 10, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 하부층(콜로이드 SnO2 아래)", "device_stack": "FTO/ALD-SnO2/colloidal SnO2/(FAPbI3)0.96(MAPbBr3)0.04/spiro-MeOTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 22.34, "pce_ref_pct": 21.42, "stability": "25±5 °C·30±5% RH 1000 h 보관: 89.3% (H2O 공정 72.5%); 비봉지 1 sun MPP 1200 s 97.90%"}, "fe": null, "key_finding": "산화제를 H2O에서 H2O2로 바꾸면 SnO2의 산소 공공이 줄어 V_OC가 오르고 PCE가 21.42%에서 22.34%로 향상된다.", "source": {"doi": "10.1039/d2nr06884b"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-007", "field": "PSC", "material": "TiO2", "elements": ["Ti"], "precursors": ["TDMAT"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 185, "temp_note": null, "cycles": null, "cycle_note": "Ar/O2 플라즈마 공정도 비교; 최고 소자는 기판을 O2 플라즈마로 5분 전처리", "thickness_nm": 20, "gpc_A": 0.5, "position": "ETL", "position_note": "FTO 위 치밀층(mp-TiO2 아래)", "device_stack": "FTO/ALD-TiO2(20 nm)/mp-TiO2/MAPbI3/spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 15.33, "pce_ref_pct": null, "stability": "장기 안정성 미보고(300 s MPP 14.3%)"}, "fe": null, "key_finding": "ALD TiO2 치밀층은 평면형(최대 8%)보다 메조포러스 구조(1.04 cm², 15.33%)에서 더 잘 작동했다.", "source": {"doi": "10.1557/adv.2018.515"}, "tags": []}, {"id": "PSC-008", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 185, "temp_note": null, "cycles": null, "cycle_note": null, "thickness_nm": 10, "gpc_A": 0.6, "position": "ETL", "position_note": "FTO 위 ETL(C60 아래)", "device_stack": "FTO/ALD-SnO2(10 nm)/C60/MAPbI3/spiro-OMeTAD/Ag", "psc": {"architecture": "n-i-p", "pce_pct": 18.3, "pce_ref_pct": null, "stability": "장기 안정성 미보고(MPP 17.9%)"}, "fe": null, "key_finding": "비정질 ALD SnO2(10 nm)는 평면형 소자에서 0.09 cm² 18.3%, 0.70 cm² 15.8%를 보였다.", "source": {"doi": "10.1557/adv.2018.515"}, "tags": []}, {"id": "PSC-009", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal+plasma", "temp_C": 190, "temp_note": null, "cycles": 79, "cycle_note": "TDMASn 0.5 s → 퍼지 → Ar 플라즈마 3 s(200 W 최적) → 퍼지 → TDMASn 0.5 s → 퍼지 → H2O 0.1 s → 퍼지; 증착 후 대기 150 °C 1 h 어닐", "thickness_nm": 10, "gpc_A": null, "position": "ETL", "position_note": "ITO/np-SnO2 사이 전자 추출층", "device_stack": "ITO/PMALD-SnOx/np-SnO2/(FAPbI3)0.95(MAPbBr3)0.05/PTAA/Au", "psc": {"architecture": "n-i-p", "pce_pct": 21.8, "pce_ref_pct": 19.8, "stability": "봉지 85 °C·85% RH 2700 h 92% (np-SnO2 단독 83%); 연속 조명 MPPT 1000 h 96% (대조군 72%); 모듈 20.1% (23.2 cm²)"}, "fe": null, "key_finding": "Ar 플라즈마 단계를 넣은 PMALD로 산소가 부족한 SnOx(x≈1.2)를 만들어 일함수 분포를 균일하게 하고 모듈 효율을 17.9%에서 20.1%로 높였다.", "source": {"doi": "10.1039/d4ta06871h"}, "tags": ["모듈"]}, {"id": "PSC-010", "field": "PSC", "material": "AZO (Al:ZnO)", "elements": ["Zn", "Al"], "precursors": ["DEZ", "TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 200, "temp_note": null, "cycles": null, "cycle_note": "슈퍼사이클 = 19×(DEZ+H2O) + 1×(TMA+H2O), 5회 반복 후 TMA+H2O로 종료(AZO-2); 비교용 ZnO는 125사이클", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 ETL", "device_stack": "FTO/ALD-AZO/MAPbI3/spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 18.09, "pce_ref_pct": 16.23, "stability": "대기 25 °C·40% RH 100 h: AZO-2 82% (ALD ZnO 41%)"}, "fe": null, "key_finding": "AZO 막의 마지막 펄스를 TMA로 끝내면(AZO-2) 그 위 MAPbI3의 열안정성과 계면 전하 수송이 좋아진다(대조 ALD ZnO 16.23% → 18.09%).", "source": {"doi": "10.1002/admi.202200575"}, "tags": []}, {"id": "PSC-011", "field": "PSC", "material": "ZnO", "elements": ["Zn"], "precursors": ["DEZ"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 70, "temp_note": null, "cycles": 330, "cycle_note": "사이클·GPC는 보충자료 값. 330×1.8 Å ≈ 59 nm로 본문 두께 30 nm와 맞지 않음(논문 내부 불일치)", "thickness_nm": 30, "gpc_A": 1.8, "position": "ETL", "position_note": "FTO 위 ETL(mp-Al2O3 아래)", "device_stack": "FTO/ALD-ZnO(30 nm)/mp-Al2O3(350 nm)/MAPbI3/spiro-OMeTAD/Ag", "psc": {"architecture": "n-i-p", "pce_pct": 13.1, "pce_ref_pct": null, "stability": "소자 안정성 미보고"}, "fe": null, "key_finding": "소결하지 않은 70 °C ALD-ZnO는 산소 공공 때문에 CH3NH3Cl과 반응하고, 450 °C로 소결하면 이 반응이 사라진다. 최고 효율 13.1%는 PbI2+MAI 전구체를 100 °C로 가열한 소자에서 나왔다.", "source": {"doi": "10.1039/c4cc04685d"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-012", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 80, "temp_note": "Beneq TFS 200, TDMASn 45 °C", "cycles": null, "cycle_note": "나노입자 AZO(100 nm) 위 ALD SnOx", "thickness_nm": 20, "gpc_A": 1.1, "position": "ETL", "position_note": "AZO 나노입자층 위, Ag 전극 아래", "device_stack": "glass/ITO/PEDOT:PSS/MAPbI3/PCBM/AZO/ALD-SnOx(20 nm)/Ag", "psc": {"architecture": "p-i-n", "pce_pct": 12.8, "pce_ref_pct": null, "stability": "비봉지 대기(23 °C, 50% RH) >300 h 열화 없음; N2 60 °C 1032 h 거의 변화 없음; 60 °C 광조사 300 h 약 60%"}, "fe": null, "key_finding": "ALD SnOx가 수분 유입과 페로브스카이트 분해 산물 유출을 동시에 막는 투과 장벽 역할을 해 전극 부식과 분해를 억제했다.", "source": {"doi": "10.1038/ncomms13938"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-013", "field": "PSC", "material": "NiO", "elements": ["Ni"], "precursors": ["Ni(MeCp)2"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": null, "temp_note": "GPC 0.32 Å는 150 °C 증착막 기준(50–300 °C 범위 조사)", "cycles": null, "cycle_note": "O2 플라즈마 100 W; 페로브스카이트 증착 전 대기 300 °C 20 min 후열처리", "thickness_nm": 10, "gpc_A": 0.32, "position": "HTL", "position_note": "ITO 위 HTL", "device_stack": "glass/ITO/ALD-NiO(10 nm)/Cs0.05(MA0.17FA0.83)Pb1.1(I0.83Br0.17)3/C60/BCP/Cu", "psc": {"architecture": "p-i-n", "pce_pct": 17.07, "pce_ref_pct": 13.98, "stability": "장기 안정성 미보고(5 min MPP 추적만)"}, "fe": null, "key_finding": "플라즈마 ALD NiO는 대기 후열처리가 핵심으로, 젖음성·전도도·이동도가 좋아져 PCE가 13.98%에서 17.07%로 올랐다.", "source": {"doi": "10.1039/c9tc04282b"}, "tags": []}, {"id": "PSC-014", "field": "PSC", "material": "NiOx", "elements": ["Ni"], "precursors": ["Ni(amd)2"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "1–2 mbar", "cycles": 185, "cycle_note": "62사이클 ≈ Si 위 5 nm; 125·185·250 사이클 비교", "thickness_nm": null, "gpc_A": null, "position": "HTL", "position_note": "PTAA/Au 사이", "device_stack": "glass/FTO/SnO2/FA0.7Cs0.3Pb(I0.9Br0.1)3/PTAA(20 nm)/ALD-NiOx/Au", "psc": {"architecture": "n-i-p", "pce_pct": 17.5, "pce_ref_pct": 10.5, "stability": "N2·25 °C LED AM1.5G MPPT 45 h 70% 유지 (PTAA 단독은 2 h 내 약 60%)"}, "fe": null, "key_finding": "페로브스카이트 위에 바로 ALD NiOx를 올리면 계면 반응으로 소자가 작동하지 않고, 20 nm PTAA 완충층을 넣어야 17.5%를 얻는다.", "source": {"doi": "10.1039/d5el00044k"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-015", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 85, "temp_note": null, "cycles": null, "cycle_note": "TDMASn 0.5 s/퍼지 15 s/H2O 0.1 s/퍼지 15 s; 두께 0–40 nm 비교", "thickness_nm": 30, "gpc_A": null, "position": "buffer", "position_note": "BCP/Cu 사이 버퍼층", "device_stack": "ITO/PTAA/WBG perovskite/PCBM/BCP/ALD-SnO2(30 nm)/Cu", "psc": {"architecture": "p-i-n", "pce_pct": 21.13, "pce_ref_pct": 19.23, "stability": "비봉지 25 °C·20–40% RH 600 h 90% (대조군 <70%); N2 600 h 감소 없음"}, "fe": null, "key_finding": "BCP 위 30 nm ALD SnO2 버퍼가 광대역 역구조 소자의 효율과 대기 안정성을 함께 높였다.", "source": {"doi": "10.1088/1674-4926/43/5/052201"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-016", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 80, "temp_note": null, "cycles": null, "cycle_note": "5·10·20·30 nm 비교", "thickness_nm": 10, "gpc_A": 1.74, "position": "buffer", "position_note": "PC61BM/Ag 사이 버퍼층", "device_stack": "glass/ITO/NiO/MeO-2PACz/perovskite/PC61BM/ALD-SnOx(10 nm)/Ag", "psc": {"architecture": "p-i-n", "pce_pct": 19.18, "pce_ref_pct": 11.28, "stability": "비봉지 대기 3000 h >90% (대조군 <70%); 봉지 85 °C·85% RH T90 >330 h (대조군 ~70 h); 미니모듈 14.12% (12.13 cm²)"}, "fe": null, "key_finding": "80 °C 저온 ALD-SnOx가 PC61BM의 핀홀과 상분리를 메워 역구조 소자 효율을 11.3%에서 19.2%로 끌어올렸다.", "source": {"doi": "10.1039/d5se01332a"}, "tags": ["모듈", "저온(≤100 °C)"]}, {"id": "PSC-017", "field": "PSC", "material": "Al2O3", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O", "O2 plasma"], "ald_mode": "thermal+plasma", "temp_C": 90, "temp_note": "최적 범위 90–120 °C, 120 °C 초과 시 PbI2 생성", "cycles": 100, "cycle_note": "열 ALD 100사이클(약 7 nm) 또는 하이브리드(열 10 + 플라즈마 90); 증착 전 2-mercaptoethanol 증기 처리(80 °C, 30 min)", "thickness_nm": 7, "gpc_A": null, "position": "encapsulation", "position_note": "MAPbI3 박막 위 봉지막", "device_stack": "유리·Si 위 MAPbI3 박막(태양전지 미제작)", "psc": {"architecture": "film only", "pce_pct": null, "pce_ref_pct": null, "stability": "포화 수증기 40 h·에탄올/IPA 침지에서 분해 억제; 플라즈마 단독 시 손상, 열 ALD 10사이클 선증착으로 방지"}, "fe": null, "key_finding": "플라즈마 손상을 막기 위해 열 ALD로 먼저 1 nm 미만을 덮고 플라즈마 ALD로 이어 쌓는 하이브리드 방식이 얇고 치밀한 봉지층을 만든다.", "source": {"doi": "10.1021/acs.jpclett.2c00862"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-018", "field": "PSC", "material": "TiOx (/TiNy)", "elements": ["Ti"], "precursors": ["TTIP"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 300, "temp_note": "기판 히터 온도", "cycles": 128, "cycle_note": "H2 플라즈마 후처리; 개선 소자는 TiNy 캡(TDMAT/NH3, 300 °C, 50사이클, 약 4 nm) 추가", "thickness_nm": 5, "gpc_A": null, "position": "recombination", "position_note": "n-Si 하부셀/SnO2 사이 재결합층", "device_stack": "n-Si(FZ)/ALD-TiOx(/TiNy)/SnO2/perovskite(1.63 eV)/spiro-MeOTAD/ITO/Ag/MgF2", "psc": {"architecture": "tandem", "pce_pct": 26.5, "pce_ref_pct": 25.5, "stability": "장기 안정성 미보고"}, "fe": null, "key_finding": "Si 위 ALD TiOx 한 층이 Si 표면 패시베이션·정공 추출·재결합 접합을 모두 맡아 ITO 없이 탠덤을 구성했다(TiOx 단독 22.4%, TiNy 캡 26.5%).", "source": {"doi": "10.1002/smll.202500969"}, "tags": ["탠덤"]}, {"id": "FE-001", "field": "FE", "material": "Hf0.5Zr0.5O2 (HZO)", "elements": ["Hf", "Zr"], "precursors": ["TDMAH", "TDMAZ"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 260, "temp_note": "기판 온도", "cycles": null, "cycle_note": "Hf:Zr = 1:1; 소스 2 s/퍼지 20 s/O3(190 g/m³) 3 s/퍼지 10 s", "thickness_nm": 10, "gpc_A": 1.3, "position": "ferroelectric layer", "position_note": null, "device_stack": "TiN/HZO/TiN(50 nm)/Ti/SiO2/Si", "psc": null, "fe": {"composition": "Hf0.5Zr0.5O2", "electrodes": "TiN/TiN", "anneal": "RTP 450 °C, N2 (시간 미기재)", "pr2_uCcm2": 40, "pr_note": "2.8 MV/cm에서 2Pr ≈ 40 μC/cm² (3.8 MV/cm에서 최대 ≈ 51)", "ec_MVcm": null, "endurance": "2.5 MV/cm에서 약 10^9 사이클 파괴 없음; 2.8 MV/cm 10^5 사이클까지 wake-up 거의 없음"}, "key_finding": "TDMA 전구체는 TEMA보다 잔류 탄소가 적고 결정립이 커서 wake-up이 거의 없는 HZO를 만든다.", "source": {"doi": "10.1186/s11671-020-03301-4"}, "tags": []}, {"id": "FE-002", "field": "FE", "material": "Hf0.5Zr0.5O2 (HZO)", "elements": ["Hf", "Zr"], "precursors": ["TDMAH", "TDMAZ"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 270, "temp_note": "챔버 온도, 약 0.4 Torr", "cycles": null, "cycle_note": "Hf:Zr = 1:1; TiN(PEALD, TDMAT + Ar/N2 플라즈마)–HZO–TiN을 진공 단절 없이 연속 증착(SNAP)", "thickness_nm": 10, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "TiN(10 nm)/HZO(10 nm)/TiN(30 nm)", "psc": null, "fe": {"composition": "Hf0.5Zr0.5O2", "electrodes": "PEALD TiN/TiN", "anneal": "RTA 30 s, 400·500·600·800 °C 비교", "pr2_uCcm2": 54.2, "pr_note": "2Pr 54.2(800 °C) / 34.6(600 °C) / 25.8(400 °C) μC/cm², PUND", "ec_MVcm": null, "endurance": "미보고"}, "key_finding": "TiN/HZO/TiN을 대기 노출 없이 연속 ALD로 쌓으면 계면 산화층이 없어 2Pr이 54.2 μC/cm²까지 커진다.", "source": {"doi": "10.1063/5.0029532"}, "tags": []}, {"id": "FE-003", "field": "FE", "material": "Hf0.5Zr0.5O2 (HZO)", "elements": ["Hf", "Zr"], "precursors": ["TEMA-Hf", "TEMA-Zr"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": 260, "temp_note": "반응기 테이블 온도(기판 온도 미기재)", "cycles": null, "cycle_note": "Hf:Zr = 3:2 도즈, 17 슈퍼사이클; 금속 전구체 퍼지 3–90 s 비교(90 s 최적)", "thickness_nm": 10, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "Pt/W(20 nm)/HZO/W(50 nm)/Si", "psc": null, "fe": {"composition": "Hf0.5Zr0.5O2−x (공칭)", "electrodes": "W/W", "anneal": "RTA 600 °C, 30 s, N2", "pr2_uCcm2": null, "pr_note": "wake-up 후 Pr > 20 μC/cm² (PUND)", "ec_MVcm": 1.0, "endurance": "6×10^7 사이클까지 큰 열화 없음(6×10^7에서 절연파괴)"}, "key_finding": "금속 전구체 퍼지가 짧으면 C·N 불순물로 반극성 Pbca 상이 생기고, 길게(90 s) 하면 강유전 Pca21 상이 우세해진다.", "source": {"doi": "10.1021/acsomega.5c01112"}, "tags": []}, {"id": "FE-004", "field": "FE", "material": "Hf0.5Zr0.5O2 (HZO)", "elements": ["Hf", "Zr"], "precursors": ["TEMA-Hf", "TEMA-Zr"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": 260, "temp_note": null, "cycles": null, "cycle_note": "슈퍼사이클 = HfO2 6 + ZrO2 4", "thickness_nm": 20, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "TaN(100 nm, 스퍼터)/HZO(20 nm)/TaN 캡(20 nm, 어닐 후 SC1 제거)", "psc": null, "fe": {"composition": "Hf0.5Zr0.5O2", "electrodes": "TaN (상부 캡은 제거)", "anneal": "RTA 600 °C, 30 s, N2", "pr2_uCcm2": null, "pr_note": "분극값 미보고(단사정 약 14%, 레이저 후 압전응답 소폭 증가)", "ec_MVcm": null, "endurance": "미보고"}, "key_finding": "488 nm 레이저로 HZO 표면의 산소 공공을 국부적으로 줄이면 강유전 Pca21 상 분율이 늘어난다(후공정 패터닝 방법).", "source": {"doi": "10.1063/5.0186481"}, "tags": []}, {"id": "FE-005", "field": "FE", "material": "Hf0.5Zr0.5O2 (HZO, 시드층+상부층)", "elements": ["Hf", "Zr"], "precursors": ["TEMA-Hf", "TEMA-Zr"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 320, "temp_note": "시드층 280 °C, 상부층 280/320 °C 비교(320 °C에서 메모리 윈도 최대)", "cycles": null, "cycle_note": "1:1 사이클비; 시드 2.2 nm(TEMA-Hf/TEMA-Zr/O3) 증착 → W 캡 600 °C 결정화(SPE) → 캡 제거 후 상부 6.8 nm. 상부층 전구체는 본문 미기재", "thickness_nm": 9.0, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "W(35 nm)/HZO/W(35 nm) MFM; W 게이트 FeFET(MFIS)", "psc": null, "fe": {"composition": "Hf0.5Zr0.5O2", "electrodes": "W/W", "anneal": "시드 RTA 600 °C 60 s N2 + 최종 RTA 550 °C 60 s N2", "pr2_uCcm2": 50, "pr_note": "시드층 소자 2Pr ≈ 50 μC/cm² (기준 대비 약 35%↑), Ec 약 50% 증가해 2.4 MV/cm", "ec_MVcm": 2.4, "endurance": "10^6 사이클까지 파괴 없음(기준 소자 약 10^3에서 파괴); FeFET 메모리 윈도 0.9 V"}, "key_finding": "얇은 HZO 시드층을 먼저 결정화(고상 에피택시)한 뒤 상부층을 고온 증착하면 결정립이 커져 2Pr·내구성·메모리 윈도가 모두 좋아진다.", "source": {"doi": "10.1039/d4nr05381h"}, "tags": []}, {"id": "FE-006", "field": "FE", "material": "(La,Y) 공도핑 HZO", "elements": ["Hf", "Zr", "La", "Y"], "precursors": ["HfCl4", "ZrCl4", "La(EtCp)2(iPr-AMD)", "Y(iPrCp)3"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 300, "temp_note": null, "cycles": null, "cycle_note": "도펀트 산화물 약 3 ALD 사이클 ≈ 1–2 at.%; (La,Gd) 조합은 Gd(iPrCp)3 사용", "thickness_nm": 9.5, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "TiN(10 nm, ALD 450 °C TiCl4/NH3)/(2La,Y):HZO/TiN(10 + 20 nm)", "psc": null, "fe": {"composition": "(2La,Y):Hf0.5Zr0.5O2, 도펀트 약 1.2–1.8 at.%", "electrodes": "ALD TiN/TiN", "anneal": "PMA 550 °C, 1 min, N2", "pr2_uCcm2": 15.6, "pr_note": "10^11 사이클 시점 2Pr 15.6 μC/cm² (2.5 MV/cm)", "ec_MVcm": null, "endurance": "1×10^11 사이클, 피로 없음"}, "key_finding": "La와 Y(또는 Gd)를 함께 도핑하면 사방정·정방정 상이 늘어 10^11 사이클에서도 피로 없는 내구성을 얻는다.", "source": {"doi": "10.1021/acsaelm.2c00063"}, "tags": []}, {"id": "FE-007", "field": "FE", "material": "Si:HfO2 (Al2O3 삽입층)", "elements": ["Hf", "Si", "Al"], "precursors": ["HfCl4", "SiCl4", "TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "Hf:Si 사이클비 16:1(2×5 nm HSO, 본문) — 그림 캡션에는 27:1로 표기(논문 내부 불일치); Al2O3 삽입층 0.6 nm; HZO(ZrCl4, 1:1)도 비교", "thickness_nm": 10, "gpc_A": null, "position": "ferroelectric layer", "position_note": null, "device_stack": "Si/TiN(10 nm, ALD)/HSO–Al2O3–HSO/TiN(10 nm, PVD)", "psc": null, "fe": {"composition": "Si-doped HfO2", "electrodes": "TiN/TiN", "anneal": "RTA 800 °C (시간·분위기 미기재)", "pr2_uCcm2": null, "pr_note": "2Pr 수치 미기재(삽입층 수 증가 시 감소 경향)", "ec_MVcm": null, "endurance": "HSO 소자 모두 절연파괴 없음; 삽입층 없는 10 nm HZO는 10^4 사이클 후 전부 파괴"}, "key_finding": "Al2O3 삽입층이 결정립을 수직으로 끊어 미세구조를 바꾸고 절연파괴를 억제해 내구성을 높인다.", "source": {"doi": "10.3389/fnano.2022.900379"}, "tags": []}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 성장 온도 100 °C (NCD Lucida D100)", "cycles": 4, "cycle_note": "TMA 0.5 s/N2 15 s/H2O 0.5 s/N2 15 s; 두께는 Si 400사이클 39.3 nm(엘립소미터)에서 외삽한 값; OAI 처리 후 증착; NCD Lucida D100", "thickness_nm": 0.393, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트 상부, OAI(옥틸암모늄 아이오다이드) 처리층 위", "device_stack": "FTO/c-TiO2/mp-TiO2/FAPbI3/OAI/ALD-AlOx/spiro-OMeTAD/Au", "fe": null, "tags": ["저온(≤100 °C)"], "material": "AlOx", "temp_C": 100, "psc": {"architecture": "n-i-p", "pce_pct": 24.13, "pce_ref_pct": 22.16, "stability": "봉지 소자 1 sun 대기 MPPT 1000 h: OAI/AlOx 95%(회복 후), OAI만 60%, 대조군 80%; 봉지 소자 85 °C·85% RH 암조건 1872 h: OAI/AlOx 90% 유지"}, "key_finding": "OAI 처리 페로브스카이트 위 4사이클 ALD-AlOx 소자에서 광조사 중 2D 페로브스카이트가 형성됐고, 저자들은 AlOx가 OA 양이온 손실을 막은 결과로 해석했다. 광안정성이 높아졌다(OAI만 23.90% → OAI/AlOx 24.13%).", "source": {"doi": "10.1002/aenm.202301717"}, "id": "PSC-019"}, {"field": "PSC", "elements": ["Al"], "precursors": ["DMAI"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "기판 온도; Oxford Instruments OpAL", "cycles": 45, "cycle_note": "DMAI 0.5 s/퍼지 20 s/H2O 0.03 s/퍼지 20 s; 두께·GPC는 c-Si 기준(페로브스카이트 위는 0.2–0.4 nm로 추정)", "thickness_nm": 0.8, "gpc_A": 0.2, "position": "passivation", "position_note": "페로브스카이트/정공수송층(spiro-OMeTAD) 계면", "device_stack": "glass/ITO/SnO2-NP/CsFAPbIBr(1.72 eV)/ALD-Al2O3/spiro-OMeTAD/MoO3/ITO/MgF2 (반투명 n-i-p)", "fe": null, "tags": ["탠덤", "저온(≤100 °C)"], "material": "Al2O3", "temp_C": 100, "psc": {"architecture": "n-i-p", "pce_pct": 13.8, "pce_ref_pct": 11.7, "stability": "장기 안정성 미보고(SPO 10분 측정값)"}, "key_finding": "넓은 밴드갭(1.72 eV) 페로브스카이트/HTL 계면에 45사이클 Al2O3를 넣어 V_OC를 110 mV 높였고(1.22 V), Si와 4단자 탠덤으로 27.1%를 얻었다.", "source": {"doi": "10.1021/acsenergylett.8b02179"}, "id": "PSC-020"}, {"field": "PSC", "elements": ["Al"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_note": null, "cycles": 5, "cycle_note": "그림 캡션: 5사이클 ≈ 0.7 nm (실험부에는 약 0.5–1 nm로 기술); 이후 EDAI2 등 쌍극자 분자층 코팅", "thickness_nm": 0.7, "gpc_A": 1.4, "position": "passivation", "position_note": "페로브스카이트 상부, 쌍극자 분자층(EDAI2·TEACl·CF3-PEAI) 아래", "device_stack": "텍스처 SHJ(IWO)/2PACz/FA0.8MA0.15Cs0.05Pb(I0.75Br0.25)3(1.68 eV)/ALD-AlOx/EDAI2/C60/ALD-SnO2/IZO/Ag grid/MgF2 (단조 탠덤)", "fe": null, "tags": ["탠덤"], "material": "AlOx", "temp_C": null, "psc": {"architecture": "tandem", "pce_pct": 31.77, "pce_ref_pct": 28.0, "stability": "비봉지 탠덤 연속 MPPT 100 h: 95.4% 유지(대조군 41.6% 감소)"}, "key_finding": "ALD-AlOx가 2D 상 형성을 억제하고 미배위 Pb2+를 패시베이션하는 지지층이 되어 그 위 쌍극자 분자층이 균일하게 형성됐다(단일접합 19.68% → 22.66%).", "source": {"doi": "10.1016/j.cej.2026.177513"}, "id": "PSC-021"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 공정 온도 70 °C (자체 제작 장치)", "cycles": null, "cycle_note": "완성된 소자 위에 직접 코팅; TMA가 spiro-OMeTAD를 통과해 매몰 계면에서 반응", "thickness_nm": null, "gpc_A": null, "position": "passivation", "position_note": "매몰 페로브스카이트/spiro-OMeTAD 계면(spiro 위에서 증착)", "device_stack": "FTO/bilayer SnO2/triple-cation perovskite/spiro-OMeTAD/Au + ALD Al2O3 코팅", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3", "temp_C": 70, "psc": {"architecture": "n-i-p", "pce_pct": 20.9, "pce_ref_pct": 18.2, "stability": "대기 보관 3200 h: 코팅 소자 95%, 코팅 없는 소자 약 60%; 대기(60% RH) MPPT 약 300 h 동안 초기의 90%; 고진공(~10^-5 Torr) MPPT 300 h 이상 후 약 94%"}, "key_finding": "spiro를 통과한 TMA가 페로브스카이트/HTL 매몰 계면에 얇은 PbI2를 만들어 비발광 재결합을 줄이고 V_OC를 약 70 mV 높였다.", "source": {"doi": "10.1021/acsenergylett.3c00296"}, "id": "PSC-022"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "증착 온도 75 °C; Picosun R-200", "cycles": 10, "cycle_note": "TMA 0.1 s/퍼지 40 s/H2O 0.1 s/퍼지 100 s; 두께·GPC는 c-Si 기준", "thickness_nm": 1.4, "gpc_A": 1.4, "position": "passivation", "position_note": "페로브스카이트/C60 계면", "device_stack": "LiF/glass/ITO/Me-4PACz/SiOx-np/Cs0.05(FA0.90MA0.10)0.95(I0.80Br0.20)3/ALD-AlOx/C60/ALD-SnOx/Ag", "fe": null, "tags": ["탠덤", "저온(≤100 °C)"], "material": "AlOx", "temp_C": 75, "psc": {"architecture": "p-i-n", "pce_pct": 20.6, "pce_ref_pct": 19.6, "stability": "N2·1 sun·약 40 °C·비봉지 MPPT 140 h: AlOx 챔피언 94.5%(대조군 70%), 외삽 T80 약 530 h vs 약 80 h; 단조 탠덤 공인 29.9% (1.17 cm²)"}, "key_finding": "페로브스카이트/C60 계면 10사이클 AlOx로 평균 V_OC가 1.13 V에서 1.195 V로 올랐고, 저자들은 표면 패시베이션 기작을 배제하고 에너지 준위 변화와 Pb0 억제를 주된 원인으로 봤다.", "source": {"doi": "10.1002/adma.202311745"}, "id": "PSC-023"}, {"field": "PSC", "elements": ["B"], "precursors": ["TDB (tris(dimethylamino)borane)"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "챔버·기판 100 °C, 5 Pa", "cycles": 40, "cycle_note": "두께는 400사이클 약 30 nm에서 추정; 2단계 어닐(증착 전 5분 어닐) 사용", "thickness_nm": 3, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트 상부", "device_stack": "FTO/TiO2/Cs0.05(FA0.83MA0.17)0.95Pb(I0.83Br0.17)3/ALD-B2O3/spiro-OMeTAD/Au", "fe": null, "tags": ["저온(≤100 °C)"], "material": "B2O3", "temp_C": 100, "psc": {"architecture": "n-i-p", "pce_pct": 21.78, "pce_ref_pct": 18.89, "stability": "비봉지 25 °C·30% RH 1개월: 85% (대조군 60%)"}, "key_finding": "ALD-B2O3의 산소가 미배위 Pb2+와 결합해 결함을 줄였고, 전구체 TDB에서 나오는 아민이 결정화에도 영향을 줬다(18.89% → 21.78%).", "source": {"doi": "10.1021/acsami.3c17899"}, "id": "PSC-024"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "챔버 온도; KE-MICRO TALD-150D", "cycles": 5, "cycle_note": "TMA 0.02 s/퍼지 50 s/H2O 0.02 s/퍼지 50 s; 2·5·10 사이클 비교(5 최적)", "thickness_nm": null, "gpc_A": null, "position": "passivation", "position_note": "매몰 계면: SAM이 덮지 못한 NiOx 표면에만 선택 증착", "device_stack": "FTO/NiOx/Me-4PACz/AS-ALD AlOx/Cs0.05FA0.85MA0.1PbI3/PEAI/PCBM/BCP/Ag", "fe": null, "tags": ["모듈", "저온(≤100 °C)"], "material": "AlOx (영역 선택 ALD)", "temp_C": 100, "psc": {"architecture": "p-i-n", "pce_pct": 26.41, "pce_ref_pct": 24.52, "stability": "ISOS-D-1 1500 h 약 95%, ISOS-D-2(85 °C) 800 h 약 80%, ISOS-T-1 48회 약 85%, ISOS-L-1 MPPT 1300 h 약 90%; 모듈 20.88% (64.68 cm²)"}, "key_finding": "SAM이 덮지 못한 NiOx 표면에만 AlOx가 자라는 영역 선택 ALD로 Ni4+ 결함과 계면 분해를 줄였다.", "source": {"doi": "10.1002/anie.202516537"}, "id": "PSC-025"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "전구체·기판 25 °C; MNT Micro and Nanotech", "cycles": 2, "cycle_note": "TMA 20 ms/50 s, H2O 20 ms/55 s; 2사이클 ≈ 0.2–0.5 nm; 비교용 SiOx는 TDMAS/O3", "thickness_nm": null, "gpc_A": null, "position": "passivation", "position_note": "매몰 계면: NiOx/페로브스카이트 사이 고정전하(음) 층", "device_stack": "FTO/NiOx/ALD-AlOx/perovskite/C60/BCP/Cu", "fe": null, "tags": ["저온(≤100 °C)"], "material": "AlOx", "temp_C": 25, "psc": {"architecture": "p-i-n", "pce_pct": 22.5, "pce_ref_pct": 19.8, "stability": "봉지 소자 1 sun·85 °C 대기 MPP 2000 h: 효율 감소 거의 없음"}, "key_finding": "ALD-AlOx의 음의 고정전하가 계면 캐리어 분포를 바꿔 재결합을 줄이고, 산성 AlOx가 고온에서 NiOx에 의한 탈양성자화를 막았다.", "source": {"doi": "10.1038/s41560-023-01377-7"}, "id": "PSC-026"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 증착 온도 100 °C; Yunmao mini-150", "cycles": 1, "cycle_note": "1사이클, TMA/H2O 펄스 5/5·10/10·25/25·50/50 ms 비교(25/25 ms 최적); 이후 PDI 처리", "thickness_nm": null, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트 상부 결정립계에 선택적으로 핵생성", "device_stack": "ITO/NiOx/Me-4PACz/WBG perovskite(1.67 eV)/ALD-Al2O3/PDI/C60/BCP/Ag", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3 (입계 선택 증착)", "temp_C": 100, "psc": {"architecture": "p-i-n", "pce_pct": 22.38, "pce_ref_pct": 21.63, "stability": "비봉지 N2 650 h: 약 95% (패시베이션 없는 대조군 약 72%); 기준 PCE는 ALD 없이 PDI만 처리한 소자(0/0 ms)"}, "key_finding": "TMA/H2O 펄스(25/25 ms)를 최적화한 1사이클 ALD에서 Al2O3가 연속막이 아닌 섬 형태로 결정립계에 우선 핵생성했고, 이후 PDI 처리와 결합해 22.38%·V_OC 1.26 V를 얻었다.", "source": {"doi": "10.1002/adfm.75644"}, "id": "PSC-027"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 증착 온도 100 °C", "cycles": null, "cycle_note": "세 계면(페로브스카이트/C60, C60/SnO2, SnO2/Cu)에 1·2·3 nm 시험, 최적 1/2/1 nm; 이송 중 대기 노출", "thickness_nm": 1, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트/C60 계면(1 nm)", "device_stack": "glass/ITO/MeO-2PACz/FA0.83Cs0.17Pb(I0.83Br0.17)3/ALD-Al2O3/C60/SnO2/Cu", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3", "temp_C": 100, "psc": {"architecture": "p-i-n", "pce_pct": null, "pce_ref_pct": null, "stability": "PCE: 이 계면 단독(1/0/0)은 평균 +0.6%p; 세 계면 조합(1/2/1·1/2/0) MPP 약 18.0% vs 기준 약 17%"}, "key_finding": "페로브스카이트/C60 계면 1 nm Al2O3는 FF를 약 2.5% 높여 평균 PCE를 0.6%p 올렸으나 V_OC는 오르지 않았다. 필름·중간 적층의 iV_OC는 변하지 않았고 완성 소자에서만 8 mV 높았으며, 물방울 시험에서는 수분 침투가 오히려 빨라졌다.", "source": {"doi": "10.1002/solr.202400247"}, "id": "PSC-028"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 증착 온도 100 °C", "cycles": null, "cycle_note": "완성 소자 위 캡핑 5·15·30 nm 비교; 캡핑 전·캡핑 1일 후·회복(4일) 후 J–V 비교", "thickness_nm": 30, "gpc_A": null, "position": "encapsulation", "position_note": "소자 전체 위 캡핑층", "device_stack": "glass/ITO/MeO-2PACz/perovskite/C60/SnO2/Cu/ALD-Al2O3(30 nm)", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3", "temp_C": 100, "psc": {"architecture": "p-i-n", "pce_pct": null, "pce_ref_pct": null, "stability": "대기·25 °C·백색 LED 연속 조사 MPP 추적: 30 nm 캡핑 소자 300 h 이상 90% 이상 유지, 캡핑 없는 소자는 300 h 후 PCE 5% 미만; 30 nm 캡핑 소자는 물 1 h 침지 후 약 80%"}, "key_finding": "30 nm ALD-Al2O3 캡핑이 수분 침투를 막아 MPP 추적 300 h 이상에서 90% 이상을 유지했다.", "source": {"doi": "10.1002/solr.202400247"}, "id": "PSC-029"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "기판·TMA·H2O 모두 상온(27 °C); Picosun R200", "cycles": 3, "cycle_note": "TMA 0.5 s/퍼지 5 s/H2O 0.1 s/퍼지 5 s; 1–4 사이클 비교(3 최적); 대조군 평균 PCE 20.33%", "thickness_nm": null, "gpc_A": null, "position": "HTL", "position_note": "NiOx/SAM(Me-4PACz) 사이 계면층", "device_stack": "glass/ITO/NiOx/ALD-Al2O3/Me-4PACz/Cs0.05FA0.75MA0.2PbI2.25Br0.75(1.615 eV)/LiF/EDADI/C60/BCP/Cu", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3", "temp_C": 27, "psc": {"architecture": "p-i-n", "pce_pct": 22.22, "pce_ref_pct": 21.28, "stability": "대기 25 °C·40–60% RH 보관 100 h: 4사이클 소자 85.70%, 3사이클 소자 77%, 대조군 23.92% (175 h: 72.54%, 45%, 6.95%); 1 cm² 3사이클 소자 20.85%"}, "key_finding": "NiOx 위 상온 ALD-Al2O3 3사이클이 그 위 SAM의 형상을 개선하고 NiOx/페로브스카이트 계면을 안정화했다.", "source": {"doi": "10.1007/s12598-025-03346-3"}, "id": "PSC-030"}, {"field": "PSC", "elements": ["Hf"], "precursors": ["TDMAH"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "챔버 80 °C, TDMAH 70 °C; MNT Micro and Nanotech", "cycles": 2, "cycle_note": "TDMAH 200 ms/50 s, H2O 20 ms/55 s; 2사이클 ≈ 0.2–0.5 nm; 증착 후 대기 400 °C 45 min 열처리(음의 고정전하)", "thickness_nm": null, "gpc_A": null, "position": "HTL", "position_note": "NiOx/SAM(Me-4PACz) 사이 계면층", "device_stack": "FTO/NiOx/n-HfOx/Me-4PACz/Cs0.04MA0.06FA0.9PbI3/3F-PEAI/C60/BCP/Cu (n-HfOx 단독 소자); 두 층 동시 적용 소자는 3F-PEAI/p-HfOx/C60", "fe": null, "tags": [], "material": "n-HfOx", "temp_C": 80, "psc": {"architecture": "p-i-n", "pce_pct": 25.8, "pce_ref_pct": 25.3, "stability": "n·p-HfOx 동시 적용 봉지 소자: 1 sun·85 °C·대기(~50% RH) MPPT T90 약 5000 h(대조군의 25배); 동시 적용 소자 27.1% (공인 26.6%)"}, "key_finding": "수산기가 많은 루이스 산성 n-HfOx가 인산기 SAM의 3자리 결합을 도와 SAM 유지와 열안정성을 높였다(n·p 동시 적용 27.1%, 공인 26.6%).", "source": {"doi": "10.1126/science.aea3339"}, "id": "PSC-031"}, {"field": "PSC", "elements": ["Hf"], "precursors": ["TDMAH"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "챔버 80 °C, TDMAH 70 °C", "cycles": 2, "cycle_note": "n-HfOx와 같은 공정, 증착 후 열처리 없음(양의 고정전하); 3F-PEAI 처리 위 증착", "thickness_nm": null, "gpc_A": null, "position": "passivation", "position_note": "페로브스카이트(3F-PEAI)/C60 계면", "device_stack": "FTO/NiOx/Me-4PACz/Cs0.04MA0.06FA0.9PbI3/3F-PEAI/p-HfOx/C60/BCP/Cu (p-HfOx 단독 소자)", "fe": null, "tags": ["저온(≤100 °C)"], "material": "p-HfOx", "temp_C": 80, "psc": {"architecture": "p-i-n", "pce_pct": 26.5, "pce_ref_pct": 25.3, "stability": "n·p-HfOx 동시 적용 봉지 소자: 1 sun·85 °C·대기(~50% RH) MPPT T90 약 5000 h"}, "key_finding": "p-HfOx가 Hf⋯F 상호작용으로 3F-PEAI를 고정해 열 탈착을 막고 이온 이동을 물리적으로 차단했다(n·p-HfOx 동시 적용 소자에서 이온 이동 활성화 에너지 0.51 → 0.72 eV, Ag 확산 억제).", "source": {"doi": "10.1126/science.aea3339"}, "id": "PSC-032"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "챔버 90 °C; Anric AT-410", "cycles": null, "cycle_note": "1사이클 = TMA 3펄스/퍼지 13 s/H2O 2펄스/퍼지 13 s; 1–5 nm 비교(3 nm 최적)", "thickness_nm": 3, "gpc_A": 0.83, "position": "passivation", "position_note": "페로브스카이트/C60 계면", "device_stack": "glass/ITO/Me-4PACz/FA0.83Cs0.17Pb(I0.8Br0.2)3(1.67 eV)/ALD-Al2O3/C60/BCP/Ag (NIR 투명형은 C60/ALD-SnO2/IZO-Ag)", "fe": null, "tags": ["탠덤", "저온(≤100 °C)"], "material": "Al2O3", "temp_C": 90, "psc": {"architecture": "p-i-n", "pce_pct": 19.16, "pce_ref_pct": 17.09, "stability": "비봉지 N2 암보관: 대조군 T80 약 100 h vs Al2O3 소자 T80 1600 h 이상; Al2O3 소자 상온 T90 1600 h 이상, 85 °C T85 600 h 이상; 4단자 탠덤 29.14% (0.175 cm²)"}, "key_finding": "3 nm Al2O3 삽입층이 페로브스카이트/C60 계면 재결합을 줄여 V_OC를 42 mV, FF를 71.44%에서 77.36%로 높였다.", "source": {"doi": "10.1002/solr.202500163"}, "id": "PSC-033"}, {"field": "PSC", "elements": ["Ta"], "precursors": ["Ta(OEt)5"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "약 300 °C; NCD Lucida D100", "cycles": null, "cycle_note": "Ta(OEt)5·H2O 펄스 1.2 s, 퍼지 15 s; 0.6·1.3·1.9·2.6 nm 비교(1.9 nm 최적)", "thickness_nm": 1.9, "gpc_A": 1.3, "position": "ETL", "position_note": "mp-TiO2 표면 개질(페로브스카이트 아래)", "device_stack": "FTO/c-TiO2/mp-TiO2/ALD-Ta2O5/perovskite/spiro-OMeTAD/Au", "fe": null, "tags": [], "material": "Ta2O5", "temp_C": 300, "psc": {"architecture": "n-i-p", "pce_pct": 21.25, "pce_ref_pct": 19.02, "stability": "대기(약 50% RH) 700 h: 85% (대조군 60%); 85 °C·UV 조사에서도 개선"}, "key_finding": "mp-TiO2 위 1.9 nm Ta2O5가 TiO2/페로브스카이트 계면 재결합을 줄이고 UV·열 안정성을 높였다.", "source": {"doi": "10.1021/acsaem.1c00367"}, "id": "PSC-034"}, {"field": "PSC", "elements": ["Zr"], "precursors": ["TDMAZr"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_note": "장비 운전 온도 80 °C; LabNano ALD", "cycles": 3, "cycle_note": "O3 40 mg/L; 사이클 수 바꿔 비교(3사이클 사용)", "thickness_nm": 1.6, "gpc_A": 4.71, "position": "passivation", "position_note": "페로브스카이트/PC61BM 계면 정공 차단층", "device_stack": "FTO/NiOx/e-MoOx/MAPbBr3/ALD-ZrO2/PC61BM/Al", "fe": null, "tags": ["저온(≤100 °C)"], "material": "ZrO2", "temp_C": 80, "psc": {"architecture": "p-i-n", "pce_pct": 10.08, "pce_ref_pct": 5.2, "stability": "2개월 보관: 대조군 5.2% → 1.5%, ZrO2 소자는 5% 미만 감소"}, "key_finding": "MAPbBr3/PC61BM 사이 3사이클 ZrO2가 깊은 HOMO로 정공을 차단해 계면 재결합을 줄였고, e-MoOx 양극 개질과 함께 V_OC 1653 mV를 얻었다.", "source": {"doi": "10.1002/solr.201800083"}, "id": "PSC-035"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "상온(RT)으로 보고", "cycles": 5, "cycle_note": "TMA 0.5 s/N2 2×0.5 s/H2O 0.5 s/N2 2×0.5 s; 50일 보관(노화)한 MAPbI3 위 증착, 5·20·50 사이클 비교; PCE는 평균값, 신규(비노화) 소자는 15.4%", "thickness_nm": null, "gpc_A": 1.4, "position": "passivation", "position_note": "노화된 페로브스카이트 상부", "device_stack": "FTO/c-TiO2/MAPbI3(노화)/RT-ALD-Al2O3/spiro-OMeTAD/Ag", "fe": null, "tags": [], "material": "Al2O3", "temp_C": null, "psc": {"architecture": "n-i-p", "pce_pct": 12.4, "pce_ref_pct": 6.1, "stability": "소자 장기 안정성은 측정하지 않음; Al2O3를 덮은 필름의 대기 안정성 향상(정성)"}, "key_finding": "아르곤 글로브박스에 50일 보관해 성능이 떨어진 MAPbI3 위에 상온 ALD Al2O3 5사이클을 넣어 평균 효율을 6.1%에서 12.4%로 회복시켰다.", "source": {"doi": "10.1002/cssc.201601186"}, "id": "PSC-036"}, {"field": "PSC", "elements": ["Al"], "precursors": ["TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_note": "ALD 공정 온도 100 °C; Oxford Instruments OpAL", "cycles": 10, "cycle_note": "TMA 0.02 s/퍼지 3.5 s/H2O 0.1 s/퍼지 3.5 s; GPC 약 0.1 nm; 2–20사이클 비교(10사이클 최적)", "thickness_nm": null, "gpc_A": 1.0, "position": "passivation", "position_note": "페로브스카이트/spiro-OMeTAD 계면", "device_stack": "glass/ITO/c-TiO2/CH3NH3PbI3−xClx/ALD-Al2O3/spiro-OMeTAD/Au", "fe": null, "tags": ["저온(≤100 °C)"], "material": "Al2O3", "temp_C": 100, "psc": {"architecture": "n-i-p", "pce_pct": 18.0, "pce_ref_pct": 15.1, "stability": "습도 노출 70일: 약 60–70% 유지(대조군 12%)"}, "key_finding": "O3 대신 H2O를 쓴 100 °C ALD Al2O3 10사이클이 페로브스카이트를 덜 손상시키면서 효율(안정화 18%)과 습도 안정성을 높였다.", "source": {"doi": "10.1039/c6ee02687g"}, "id": "PSC-037"}, {"id": "PSC-038", "field": "PSC", "material": "(Al,Sn)Ox (Al 31%)", "elements": ["Al", "Sn"], "precursors": ["TMA", "TDMASn"], "coreactants": [], "ald_mode": "unknown", "temp_C": 190, "temp_note": null, "cycles": null, "cycle_note": "TMA/(TMA+TDMASn) 서브사이클 비 0.04–0.10으로 Al 비율 0·19·31·53% 조절(31% 최적)", "thickness_nm": 10, "gpc_A": null, "position": "ETL", "position_note": "ITO/np-SnO2 사이 전자 추출층", "device_stack": "ITO/(Al,Sn)Ox(10 nm)/np-SnO2/(FAPbI3)0.95(MAPbBr3)0.05/PTAA/Au", "psc": {"architecture": "n-i-p", "pce_pct": 24.6, "pce_ref_pct": 22.7, "stability": "봉지 소자 85 °C·85% RH·1 sun 1200 h: 약 90% 유지(ALD층 없는 소자 80% 미만); 1 sun MPPT 1250 h 90% 이상"}, "fe": null, "key_finding": "ITO와 np-SnO2 사이에 Al 31% (Al,Sn)Ox 10 nm를 넣어 ITO의 일함수를 약 100 meV 높이고 표면 일함수 분포를 고르게 해 효율을 22.7%에서 24.6%로 올렸다.", "source": {"doi": "10.1002/smll.202412702"}, "tags": []}, {"id": "PSC-039", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "증착 온도 100 °C, TDMASn 용기 70 °C", "cycles": null, "cycle_note": "H2O 0.05 s/퍼지 8.0 s → TDMASn 0.08 s/퍼지 7.0 s (산소원 먼저 주입); 38·75·150·225·300 사이클로 두께 조절, 산소원 먼저일 때 20 nm·주석원 먼저일 때 30 nm가 최적", "thickness_nm": 20, "gpc_A": 1.3, "position": "buffer", "position_note": "C60/스퍼터 ITO 사이 스퍼터링 보호 버퍼층", "device_stack": "ITO/MeO-2PACz/perovskite/C60/ALD-SnO2/ITO (반투명)", "psc": {"architecture": "p-i-n", "pce_pct": 19.99, "pce_ref_pct": 19.37, "stability": "기준 PCE는 같은 ALD SnO2를 주석원 먼저 주입한 소자; 비봉지 대기(30% RH) 600 h 96.6%, N2·85 °C 600 h 95.6%; 4단자 Si 탠덤 28.77%"}, "fe": null, "key_finding": "ALD 주입 순서를 H2O 먼저로 바꾸면 C60 표면에 –OH 핵생성 자리가 생겨 섬 성장이 층상 성장으로 바뀌고, 더 치밀한 SnO2 버퍼층으로 반투명 소자 효율이 19.37%에서 19.99%로 올랐다.", "source": {"doi": "10.1002/smll.202502206"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-040", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "80·100·120 °C 비교, 100 °C 최적", "cycles": null, "cycle_note": null, "thickness_nm": null, "gpc_A": null, "position": "recombination", "position_note": "페로브스카이트 상부셀과 유기 하부셀 사이 연결층(ICL)", "device_stack": "광대역(1.80 eV) 페로브스카이트 셀/ALD-SnOx 연결층/유기 하부셀 (2단자 페로브스카이트/유기 탠덤)", "psc": {"architecture": "tandem", "pce_pct": 25.9, "pce_ref_pct": null, "stability": "단일접합 1.80 eV 소자 100 °C SnOx 20.58% (80 °C SnOx 18.13%); 비봉지 탠덤 대기(40% RH, 실온) 1003 h 92% 유지; 1 cm² 24.36%, 유연 탠덤 24.39%"}, "fe": null, "key_finding": "ALD 온도(80·100·120 °C)로 SnOx의 결정면 배향과 산소 화학량을 조절했고, 100 °C 막을 연결층으로 써서 페로브스카이트/유기 탠덤 25.90%를 얻었다.", "source": {"doi": "10.1002/adfm.202531732"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-041", "field": "PSC", "material": "SnO2/Al:In2O3 (AIO, Al 3 at.%) 이중층", "elements": ["Sn", "In", "Al"], "precursors": ["TDMASn", "DADI", "TMA"], "coreactants": ["H2O", "O3"], "ald_mode": "thermal", "temp_C": 80, "temp_note": "SnO2·AIO 모두 80 °C; DADI 용기 45 °C", "cycles": null, "cycle_note": "SnO2 5 nm(TDMASn 2 s/Ar 10 s/H2O 3 s/Ar 15 s) 위 AIO 15 nm; AIO는 In2O3(DADI 2 s/10 s/O3 1 s/10 s) m회 + Al2O3(TMA 0.1 s/10 s/H2O 3 s/15 s) 1회 슈퍼사이클, m = 100·50·25", "thickness_nm": null, "gpc_A": null, "position": "buffer", "position_note": "광대역 상부셀 C60 위 ETL (SnO2가 O3로부터 페로브스카이트 보호)", "device_stack": "FTO/NiOx/…/WBG perovskite(1.77 eV)/LiF/C60/ALD-SnO2(5 nm)/ALD-AIO(15 nm)/…/협대역 하부셀 (2단자 전페로브스카이트 탠덤)", "psc": {"architecture": "tandem", "pce_pct": 25.46, "pce_ref_pct": 23.58, "stability": "기준 PCE는 ALD SnO2만 쓴 탠덤(표 1); 정상 상태 효율 약 25.1%"}, "fe": null, "key_finding": "ALD SnO2 5 nm로 O3 손상을 막고 그 위에 Al 3 at.% In2O3 15 nm를 올린 저온(80 °C) 이중 ETL이 직렬저항을 낮추고 용액 손상을 막아 전페로브스카이트 탠덤 25.46%를 얻었다.", "source": {"doi": "10.1002/smll.202407036"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-042", "field": "PSC", "material": "SnO2:Nb", "elements": ["Sn", "Nb"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": 100, "temp_note": "저온 ALD 100 °C", "cycles": null, "cycle_note": "SnO2:Nb 사이클 비 5:1·10:1·15:1, 전구체 주입 순서 SONO/OSNO 비교(OSNO 5:1 최적); 시작과 끝에 SnO2 3사이클 이상; 두께는 Si 기준 약 15 nm", "thickness_nm": 15, "gpc_A": null, "position": "buffer", "position_note": "C60 위 ETL", "device_stack": "…/perovskite/EDAI+PEACl/C60/ALD-SnO2:Nb/Au (p-i-n; 4 cm² 미니모듈은 6셀 직렬)", "psc": {"architecture": "p-i-n", "pce_pct": 16.33, "pce_ref_pct": 14.26, "stability": "PCE는 평균값(0.09 cm²); 미니모듈 ISOS-L-3(1 sun·85 °C·50% RH) 300 h 후 기준 모듈보다 0.6%p 높음"}, "fe": null, "key_finding": "ALD로 Nb를 넣은 SnO2를 p-i-n 소자 ETL로 처음 적용했고, OSNO 순서·5:1 비율에서 순수 SnO2보다 평균 효율이 약 2%p 높았다.", "source": {"doi": "10.1021/acsaem.6c00059"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-043", "field": "PSC", "material": "SnOx (치밀/성긴 이중 버퍼)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 85, "temp_note": "기판 85 °C, TDMASn 75 °C, H2O 35 °C", "cycles": null, "cycle_note": "TDMASn·H2O 펄스 각 100 ms; 퍼지 10 s로 치밀한 SnOx 55사이클 → 퍼지 2 s로 성긴 SnOx 55사이클; 퍼지를 10 s에서 2 s로 줄이면 성장률 평균 1.5 → 2.3 Å/cycle", "thickness_nm": null, "gpc_A": 1.5, "position": "buffer", "position_note": "C60/스퍼터 IZO 사이 이중 버퍼층", "device_stack": "60 μm 유연 Si 하부셀/HTL201/perovskite/LiF/EDAI/C60(8 nm)/ALD-SnOx/IZO(40 nm)/Ag", "psc": {"architecture": "tandem", "pce_pct": 33.4, "pce_ref_pct": null, "stability": "공인 33.4% (1 cm²), 260 cm² 공인 29.8%; 봉지 소자 열 사이클(−40~85 °C) 250회 후 평균 97.2% 유지(대조군 81.8%); 굽힘 43,000회 후 97% 이상"}, "fe": null, "key_finding": "퍼지 시간을 짧게 해 CVD처럼 자란 성긴 SnOx를 치밀한 ALD SnOx 위에 올려 스퍼터 손상과 응력을 흡수하게 했고, C60/SnOx 계면 박리를 줄여 유연 페로브스카이트/Si 탠덤 공인 33.4%를 얻었다.", "source": {"doi": "10.1038/s41586-025-09835-w"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-044", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": null, "thickness_nm": 15, "gpc_A": null, "position": "buffer", "position_note": "C60과 RPD-SnOx 전면 전극 사이 버퍼층", "device_stack": "SHJ 하부셀/RPD-SnOx 재결합층/MeO-4PACz/perovskite/C60/ALD-SnOx(15 nm)/RPD-SnOx(50 nm)/Ag/MgFx (인듐 없는 탠덤)", "psc": {"architecture": "tandem", "pce_pct": 33.2, "pce_ref_pct": null, "stability": "SnOx 재결합층 탠덤 33.9%(공인 33.6%), IZO·ITO 대조 소자 32.7%; 비봉지 N2 1 sun MPP 3000 h: 대조군 약 50%, SnOx-RL 탠덤 70.8%; 미니모듈 공인 31.0% (207.9 cm²)"}, "fe": null, "key_finding": "ALD-SnOx 버퍼층과 반응성 플라즈마 증착 SnOx 전면 전극이 함께 수분 장벽 역할을 해, 인듐 없는 페로브스카이트/Si 탠덤에서 할로겐 이동에 의한 열화를 줄였다.", "source": {"doi": "10.1126/science.aef5355"}, "tags": ["탠덤"]}, {"id": "PSC-045", "field": "PSC", "material": "SnOx (SnOx(i) 계면층 + SnOx)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "TDMASn:H2O 도즈(ms) 25:20~250:20, 50–500사이클 비교; 계면층 SnOx(i) 200:20 30사이클 → SnOx 50:20 300사이클이 최적", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "페로브스카이트 바로 위 ETL (풀러렌 없음)", "device_stack": "glass/ITO/HTL/perovskite/ALD-SnOx(i)/ALD-SnOx/Ag (p-i-n)", "psc": {"architecture": "p-i-n", "pce_pct": 25.1, "pce_ref_pct": 21.8, "stability": "기준 PCE는 계면층 없이 SnOx 300사이클만 쓴 소자; 1 sun·65 °C MPPT T95 2000 h 이상, 공인 T97 1000 h 이상; ISOS-T-3 800회 평균 약 4.7% 감소"}, "fe": null, "key_finding": "TDMASn:H2O 도즈 비로 산소 공공을 조절한 SnOx(i) 계면층을 페로브스카이트 위에 바로 증착해 풀러렌 없는 p-i-n 소자에서 25.1%와 65 °C T95 2000 h 이상을 얻었다.", "source": {"doi": "10.1126/science.adq8385"}, "tags": []}, {"id": "PSC-046", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": 100, "temp_note": "50–200 °C 비교, 100 °C 이하에서도 고효율(70 °C 평균 17% 이상); TDMA-Sn 75 °C; Ensure Scientific AutoALD-PE", "cycles": null, "cycle_note": "40·70·100·130·160·190 사이클 비교(100 °C), 130사이클 ≈ 15 nm; 그 위에 C60-SAM 패시베이션", "thickness_nm": null, "gpc_A": 1.7, "position": "ETL", "position_note": "FTO 위 ETL (C60-SAM 아래)", "device_stack": "glass/FTO/PEALD-SnO2/C60-SAM/MAPbI3(Pb(SCN)2 첨가)/spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 19.03, "pce_ref_pct": null, "stability": "유연(ITO/PET) 기판 최고 16.80%"}, "fe": null, "key_finding": "플라즈마 ALD로 SnO2 ETL 증착 온도를 100 °C 이하로 낮추고도 C60-SAM 패시베이션과 함께 유리 기판 19.03%, 유연 기판 16.80%를 얻었다.", "source": {"doi": "10.1039/c6ta04503k"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-047", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": 200, "temp_note": "50·100·150·200 °C 비교; GPC 50 °C 1.5, 100 °C 1.2, 150 °C 1.3, 200 °C 1.4 Å; Oxford Instruments OpAL", "cycles": null, "cycle_note": "TDMASn 2 s/퍼지 10 s/O2 플라즈마 10 s(300 W, 100 mTorr)/퍼지 5 s; 버블러 45 °C", "thickness_nm": 15, "gpc_A": 1.4, "position": "ETL", "position_note": "ITO 위 ETL", "device_stack": "ITO/PA-ALD SnO2(15 nm)/Cs 포함 삼중양이온 perovskite/spiro-OMeTAD/Au(80 nm)", "psc": {"architecture": "n-i-p", "pce_pct": 17.8, "pce_ref_pct": null, "stability": "50 °C SnO2 소자 17.5%; N2·1 sun MPP 16 h: 200 °C 소자 초기값 유지, 50 °C 소자 약 50% 감소"}, "fe": null, "key_finding": "50 °C와 200 °C 플라즈마 ALD SnO2는 초기 효율이 비슷했지만(17.5%, 17.8%), 전기전도도가 높은 200 °C 막만 1 sun 연속 조사에서 성능을 유지했다.", "source": {"doi": "10.1021/acsami.8b09515"}, "tags": []}, {"id": "PSC-048", "field": "PSC", "material": "MgSnOx (Mg 약 10%)", "elements": ["Mg", "Sn"], "precursors": ["TDMASn", "Mg(EtCp)2"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": null, "cycles": null, "cycle_note": "MgO 사이클/(SnO2+MgO) 사이클 비로 Mg 함량 조절(0·10·20%), Mg 10% 최적; 두께는 사이클 수로 조절", "thickness_nm": 6, "gpc_A": null, "position": "ETL", "position_note": "FTO/용액 SnO2 사이 계면층", "device_stack": "FTO/ALD-MgSnOx(6 nm)/용액 SnO2/CsPbI3/… (n-i-p)", "psc": {"architecture": "n-i-p", "pce_pct": 18.5, "pce_ref_pct": 13.42, "stability": "비봉지 대기(18–30% RH, 실온) 717 h 98%; N2·1 sun 200 h 90%"}, "fe": null, "key_finding": "FTO 위 6 nm ALD MgSnOx 계면층이 FTO를 고르게 덮고 FTO와 용액 SnO2 사이 에너지 준위를 계단식으로 맞춰 CsPbI3 소자 효율을 13.42%에서 18.50%로 올렸다.", "source": {"doi": "10.1039/d5ta03780h"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-049", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 120, "temp_note": "기판 120 °C, TDMASn 50 °C; 증착 후 200 °C 열처리(RTP)", "cycles": 150, "cycle_note": "펄스 1.5 s/퍼지 15 s; O3 15 wt%", "thickness_nm": 15, "gpc_A": 1.01, "position": "ETL", "position_note": "ITO 위 ETL", "device_stack": "ITO/ALD-SnO2(15 nm)/perovskite/spiro-OMeTAD/Ag", "psc": {"architecture": "n-i-p", "pce_pct": 18.97, "pce_ref_pct": 18.46, "stability": "기준 PCE는 스핀코팅 SnO2 소자; 소자 간 PCE 편차 ALD 11.5%로 스핀코팅보다 작음"}, "fe": null, "key_finding": "O3로 120 °C에서 증착한 15 nm ALD SnO2가 스핀코팅 SnO2보다 표면이 매끈하고 Jsc가 0.75 mA/cm² 높아 18.97%를 얻었고, 소자 간 편차도 줄었다.", "source": {"doi": "10.3740/MRSK.2023.33.11.475"}, "tags": []}, {"id": "PSC-050", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": 100, "temp_note": "ALD 챔버 100 °C, 약 20분", "cycles": null, "cycle_note": null, "thickness_nm": 20, "gpc_A": null, "position": "buffer", "position_note": "PCBM/AgNW 전극 사이 보호·접촉층", "device_stack": "ITO/PTAA/FA0.9Cs0.1Pb(I0.7Br0.3)3(1.71 eV)/PDADI/PCBM/ALD-SnO2(20 nm)/AgNWs (반투명)", "psc": {"architecture": "p-i-n", "pce_pct": 17.5, "pce_ref_pct": null, "stability": "불투명 대조 소자(증착 Ag 전극) 19.36%; 비봉지 N2 600 h: 85 °C 80%, 1 sun 광조사 90%"}, "fe": null, "key_finding": "ALD SnO2가 AgNW와 페로브스카이트 할라이드의 반응을 막고, PEAI 대신 열안정성이 높은 PDADI로 표면을 처리해 100 °C ALD 공정을 견디게 했다.", "source": {"doi": "10.1002/sus2.256"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-051", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "ALD SnO2 두께 5–20 nm 이상 비교, 5 nm 최적", "thickness_nm": 5, "gpc_A": null, "position": "ETL", "position_note": "고헤이즈 FTO 표면 개질층(PAA-SnO2 양자점층 아래)", "device_stack": "FTO(고헤이즈)/ALD-SnO2(5 nm)/PAA-SnO2/FAPbI3(1.54 eV)/…/Au (n-i-p)", "psc": {"architecture": "n-i-p", "pce_pct": 24.97, "pce_ref_pct": 21.72, "stability": "기준 PCE는 ALD층 없이 PAA-SnO2만 쓴 소자; 비봉지 건조 공기 80일 95.32%, MPPT 500 h 89.61%; 1 cm² 23.18%"}, "fe": null, "key_finding": "FTO 위 5 nm ALD SnO2가 수산기가 많은 표면을 만들어 PAA-SnO2 양자점층의 부착을 돕고 정공을 차단해, V_OC가 1.133 V에서 1.188 V로 오르며 효율이 높아졌다.", "source": {"doi": "10.1002/adfm.202419678"}, "tags": []}, {"id": "PSC-052", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 150, "temp_note": "ALD 150 °C (CN-1 Basic)", "cycles": 190, "cycle_note": "TDMASn 0.7 s/Ar 15 s/O3 5 s/Ar 15 s; 증착 후 O2 반응성 이온 식각(RIE) 처리 5분·50 W (UV-O3 1 h 대체)", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 단일층 ETL", "device_stack": "FTO/ALD-SnO2/perovskite/spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 23.13, "pce_ref_pct": 21.88, "stability": "기준 PCE는 UV-O3 처리한 ALD-SnO2 소자; 건조실(20 °C, 15% RH) 1000 h 95% 이상(기준 87%)"}, "fe": null, "key_finding": "ALD SnO2 표면을 O2 RIE로 5분 처리하면 1시간 UV-O3 처리보다 결함 패시베이션이 잘 되어 효율이 21.88%에서 23.13%로 올랐고 공정 시간은 90% 이상 줄었다.", "source": {"doi": "10.1021/acsaem.5c03585"}, "tags": []}, {"id": "PSC-053", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O2"], "ald_mode": "spatial", "temp_C": 100, "temp_note": "공간분할 ALD(SALD) 100 °C", "cycles": null, "cycle_note": "O2·H2O·H2O2 비교, H2O2 선택; TDMASn 운반 가스 250 sccm, 산소원 50 sccm, 기판 속도 75 mm/s, 간격 1 mm; 20×20 cm² 두께 불균일도 2.24%", "thickness_nm": 30, "gpc_A": null, "position": "buffer", "position_note": "p-i-n 소자 상부 ETL", "device_stack": "p-i-n 모듈 400 cm²: …/perovskite/…/SALD-SnO2/전극", "psc": {"architecture": "p-i-n", "pce_pct": 19.35, "pce_ref_pct": null, "stability": "PCE는 400 cm² 모듈 값; 소자 연속 광조사 600 h 약 82% 유지"}, "fe": null, "key_finding": "공간분할 ALD에서 산소원 반응성과 운반 가스 유량으로 산소 공공을 조절해 100 °C에서 이동도 19.4 cm²/V·s의 SnO2를 얻었고, 400 cm² 역구조 모듈 19.35%를 달성했다.", "source": {"doi": "10.1016/j.cej.2025.159629"}, "tags": ["모듈", "저온(≤100 °C)"]}, {"id": "PSC-054", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "약 10 nm 두 번: P2 스크라이빙 전 C60 위 보호층, P2 후 전도성 확산 방지층(CDB)", "thickness_nm": 10, "gpc_A": null, "position": "buffer", "position_note": "모듈 P2 스크라이빙 영역에서 금속 전극과 페로브스카이트 사이 확산 방지층", "device_stack": "전페로브스카이트 탠덤 모듈: …/WBG perovskite/…/NBG perovskite(MA0.3FA0.7Pb0.5Sn0.5I3)/C60/ALD-SnO2/(P2)/ALD-SnO2 CDB/금속 전극", "psc": {"architecture": "tandem", "pce_pct": 21.7, "pce_ref_pct": null, "stability": "PCE는 공인 모듈 값(개구 20.25 cm²); 1 cm² 탠덤 정상 상태 24.8%; 봉지 모듈 대기 1 sun MPP 500 h 75% 유지"}, "fe": null, "key_finding": "ALD SnO2를 전자 추출층이자 서브셀 연결부의 확산 방지층으로 써서 할라이드–금속 상호확산과 전극 반응을 막고, 블레이드 코팅 전페로브스카이트 탠덤 모듈 공인 21.7%를 얻었다.", "source": {"doi": "10.1126/science.abn7696"}, "tags": ["탠덤", "모듈"]}, {"id": "PSC-055", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": null, "temp_note": null, "cycles": 40, "cycle_note": "0–80사이클(0–5 nm) 비교, 40사이클 최적; ALD+졸-젤 이중층 총 두께 약 17 nm", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 하부층(졸-젤 SnO2 아래)", "device_stack": "FTO/ALD-SnO2/졸-젤 SnO2/α-FAPbI3(2단계 공정)/…", "psc": {"architecture": "n-i-p", "pce_pct": 23.86, "pce_ref_pct": 22.09, "stability": "기준 PCE는 졸-젤 SnO2만 쓴 소자; N2(20% 습도) 1300 h 85% 유지"}, "fe": null, "key_finding": "FTO 위 얇은 ALD SnO2가 기판 거칠기를 고르게 하고 PbI2 결정 성장을 도와, 졸-젤 SnO2와의 이중층에서 V_OC가 1.106 V에서 1.158 V로 오르고 효율이 22.09%에서 23.86%가 됐다.", "source": {"doi": "10.1002/smll.202303254"}, "tags": []}, {"id": "PSC-056", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 120, "temp_note": "기판 120 °C, TDMASn 50 °C", "cycles": null, "cycle_note": "소스 공급 1.5 s, 퍼지 15 s; 사이클 수로 10·15·20 nm 비교, 15 nm 최적", "thickness_nm": 15, "gpc_A": null, "position": "ETL", "position_note": "하부 ETL", "device_stack": "…/ALD-SnO2(15 nm)/광대역 perovskite(1.68 eV)/HTL/Ag(120 nm)", "psc": {"architecture": "n-i-p", "pce_pct": 15.93, "pce_ref_pct": 15.17, "stability": "PCE는 평균값; 기준은 스핀코팅 SnO2 소자"}, "fe": null, "key_finding": "ALD SnO2는 15 nm 이상에서 스핀코팅보다 고르게 덮여 그 위 광대역 페로브스카이트의 결정성이 좋아졌고, 15 nm가 전하 추출과 재결합 억제에 가장 알맞았다.", "source": {"doi": "10.7836/kses.2026.46.1.001"}, "tags": []}, {"id": "PSC-057", "field": "PSC", "material": "SnOx/AZO 이중층", "elements": ["Sn", "Zn", "Al"], "precursors": ["DEZ", "TMA"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "SnOx 100사이클 + AZO 400사이클(DEZ–H2O 사이클 사이에 TMA 1회로 Al 도핑); 비교군은 SnOx 250사이클; SnOx 전구체·온도는 보충자료", "thickness_nm": null, "gpc_A": null, "position": "buffer", "position_note": "C60/스퍼터 IZO 사이 버퍼층", "device_stack": "TOPCon Si 하부셀/…/perovskite/C60/ALD-SnOx/ALD-AZO/IZO/Ag (단조 탠덤)", "psc": {"architecture": "tandem", "pce_pct": 33.25, "pce_ref_pct": null, "stability": "단일접합 23.47%; 탠덤 N2·25 °C 1 sun MPPT 1000 h 96% 이상; 단일접합 MPPT 2000 h 96% (SnOx만 쓴 소자 700 h에 80%)"}, "fe": null, "key_finding": "SnOx 위에 ALD AZO를 더한 전부 ALD 이중층이 이온 확산과 수분 침투를 막아 페로브스카이트/C60/버퍼 계면 반응을 줄였고, 1 cm² 탠덤 33.25%를 얻었다.", "source": {"doi": "10.1002/adfm.76873"}, "tags": ["탠덤"]}, {"id": "PSC-058", "field": "PSC", "material": "SnOx", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O2 plasma"], "ald_mode": "plasma", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": "TDMASn 2 s/퍼지 10 s/O2 플라즈마 10 s(300 W, 약 13 Pa)/퍼지 5 s; 버블러 45 °C; 증착 후 150 °C 30분 열처리, 그 위 PbS 1 nm 열증착", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "ITO 위 ETL (상부 PbS 1 nm 패시베이션)", "device_stack": "ITO/PEALD-SnOx/PbS(1 nm)/perovskite(1.68 eV)/Spiro-OMeTAD/Au", "psc": {"architecture": "n-i-p", "pce_pct": 20.39, "pce_ref_pct": 17.42, "stability": "기준 PCE는 PbS 없이 ALD SnOx만 쓴 소자; 1.55 eV 23.16% (기준 19.18%), 1.63 eV 22.15% (기준 18.09%)"}, "fe": null, "key_finding": "플라즈마 ALD SnOx 표면에 PbS 1 nm를 올려 SnOx와 페로브스카이트를 잇는 다리 역할을 하게 했고, 1.68 eV 소자의 V_OC를 1.16 V에서 1.22 V로 높였다.", "source": {"doi": "10.1002/solr.202400879"}, "tags": []}, {"id": "PSC-059", "field": "PSC", "material": "SnO2 (DMPS 용액조 후처리)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 150, "temp_note": "기판 150 °C, TDMASn 75 °C; Veeco Fiji G2", "cycles": null, "cycle_note": "TDMASn 0.1 s/퍼지 8 s/H2O 0.06 s/퍼지 10 s, 증착 후 열처리 없음; 이후 DMPS 수용액 90 °C 침지 → 150 °C 1 h 열처리", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 단일층 ETL", "device_stack": "FTO/ALD-SnO2(DMPS 처리)/FAPbI3/2D 층/spiro-OMeTAD/… (n-i-p)", "psc": {"architecture": "n-i-p", "pce_pct": 25.26, "pce_ref_pct": 20.48, "stability": "기준 PCE는 후처리 없는 ALD-SnO2 소자; MPPT 1500 h 93.0%, 미니모듈(12.5 cm²) 22.42%(기준 17.12%)·1000 h 85.6%; 기준 소자는 940 h 55.7%"}, "fe": null, "key_finding": "ALD SnO2를 DMPS 수용액조에 담가 막 속 잔류 유기 리간드를 제거하고 표면을 재구성해, 단일층 ALD SnO2 소자 효율을 20.48%에서 25.26%로 올렸다.", "source": {"doi": "10.1021/acsami.6c00556"}, "tags": ["모듈"]}, {"id": "PSC-060", "field": "PSC", "material": "SnOx 이중층 (열 ALD + 플라즈마 ALD)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O", "O2 plasma"], "ald_mode": "thermal+plasma", "temp_C": null, "temp_note": null, "cycles": 150, "cycle_note": "열 ALD SnOx(TDMASn/H2O) 50사이클 위에 플라즈마 ALD SnOx(TDMASn/O2 플라즈마) 100사이클; 플라즈마 ALD를 C60 위에 바로 올리면 V_OC·FF 저하", "thickness_nm": null, "gpc_A": null, "position": "buffer", "position_note": "C60 위 (열 ALD층이 플라즈마 손상을 막는 하부층)", "device_stack": "ITO/NiOx/Me-4PACz/Cs0.17FA0.83Pb(I0.80Br0.20)3/C60/열-SnOx/플라즈마-SnOx/Ag (탠덤은 Si 하부셀 위 같은 상부셀)", "psc": {"architecture": "p-i-n", "pce_pct": 23.76, "pce_ref_pct": 21.84, "stability": "기준 PCE는 열 ALD SnOx만 쓴 소자; 단일접합 N2 MPPT 1492 h 95% 이상(기준 358 h에 92%); 1 cm² 탠덤 32.16%, N2 1 sun 1350 h 90% 이상"}, "fe": null, "key_finding": "얇은 열 ALD SnOx가 C60 계면을 플라즈마로부터 보호하고 그 위 치밀한 플라즈마 ALD SnOx가 이온·수분을 막는 이중층으로, 광대역 단일접합 23.76%와 탠덤 32.16%를 얻었다.", "source": {"doi": "10.1016/j.jechem.2026.06.054"}, "tags": ["탠덤"]}, {"id": "PSC-061", "field": "PSC", "material": "SnO2 (자기 패시베이션 PTO)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["O3"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "100 또는 120 °C 증착 비교; 최종 PTO층은 100 °C 증착 후 180 °C 1 h 열처리", "cycles": null, "cycle_note": "저온 증착 시 막에 남은 TDMASn이 표면 패시베이션 역할; 분무 c-TiO2 하부층과 결합(Type 1)", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO/c-TiO2 위 ETL", "device_stack": "FTO/c-TiO2(분무 열분해)/ALD-SnO2(PTO)/(FAPbI3)0.85(MAPbBr3)0.15/PTAA/…", "psc": {"architecture": "n-i-p", "pce_pct": 20.03, "pce_ref_pct": null, "stability": null}, "fe": null, "key_finding": "저온 ALD SnO2 막에 남은 TDMASn 잔류물이 페로브스카이트/ETL 계면의 자기 패시베이션층으로 작용함을 밝혔고, c-TiO2와의 이중층으로 정공 차단을 강화해 20.03%를 얻었다.", "source": {"doi": "10.1002/advs.201800130"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-062", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": 100, "temp_note": null, "cycles": null, "cycle_note": "BCP 대신 5·10·15·20 nm 비교, 15 nm 최적", "thickness_nm": 15, "gpc_A": 1.11, "position": "buffer", "position_note": "C60(25 nm) 위 BCP 대체층", "device_stack": "…/perovskite/C60(25 nm)/ALD-SnO2(15 nm)/전극 (p-i-n, 30×30 cm 모듈 포함)", "psc": {"architecture": "p-i-n", "pce_pct": 23.85, "pce_ref_pct": 22.86, "stability": "기준 PCE는 BCP 소자; 30×30 cm 모듈 17.30%(BCP 모듈 10.60%); 봉지 모듈 습한 대기 5000 h 94% 이상, N2·60 °C 3000 h 89% (BCP 모듈 0%)"}, "fe": null, "key_finding": "C60 위 BCP를 15 nm ALD SnO2로 바꿔 효율을 22.86%에서 23.85%로 올리고, 30×30 cm 모듈에서 균일성과 수분·열 안정성을 크게 높였다.", "source": {"doi": "10.1021/acsami.4c14954"}, "tags": ["모듈", "저온(≤100 °C)"]}, {"id": "PSC-063", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": [], "coreactants": [], "ald_mode": "unknown", "temp_C": 100, "temp_note": null, "cycles": null, "cycle_note": "0·2.5·5·7.5·10 nm 비교, 2.5 nm 최적", "thickness_nm": 2.5, "gpc_A": null, "position": "buffer", "position_note": "BCP/Ag 사이 초박막 층", "device_stack": "ITO/MeO-2PACz/perovskite/C60(30 nm)/BCP(8 nm)/ALD-SnO2(2.5 nm)/Ag(100 nm)", "psc": {"architecture": "p-i-n", "pce_pct": 17.9, "pce_ref_pct": 12.61, "stability": "기준 PCE는 ALD SnO2 없는 소자; 비봉지 대기 23일 89.6%"}, "fe": null, "key_finding": "BCP 위 2.5 nm ALD SnO2가 직렬저항을 줄이고 병렬저항을 높여 FF를 26%, 효율을 42% 높였고, 두께가 늘면 직렬저항이 커져 성능이 떨어졌다.", "source": {"doi": "10.1016/j.mtcomm.2025.112921"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-064", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": [], "ald_mode": "unknown", "temp_C": 180, "temp_note": "챔버 180 °C, TDMASn 용기 50 °C", "cycles": 100, "cycle_note": "100사이클(약 72분); 그 위에 스핀코팅 SnO2 (ALD+SC 순서가 최적, SC+ALD·ALD 단독은 낮음)", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "기판 위 하부 ETL (스핀코팅 SnO2 아래)", "device_stack": "기판/ALD-SnO2/스핀코팅 SnO2/perovskite/Spiro-OMeTAD/…", "psc": {"architecture": "n-i-p", "pce_pct": 22.12, "pce_ref_pct": 19.8, "stability": "기준 PCE는 스핀코팅 SnO2만 쓴 소자; ALD SnO2 단독 12.25%"}, "fe": null, "key_finding": "ALD SnO2를 스핀코팅 SnO2 아래에 넣은 순서에서만 비발광 재결합이 줄어 22%를 넘었고, ALD 단독이나 반대 순서는 효율이 크게 낮았다.", "source": {"doi": "10.1007/s44405-025-00010-3"}, "tags": []}, {"id": "PSC-065", "field": "PSC", "material": "SnO2 (UV 광결정화)", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 125, "temp_note": "챔버 125 °C, TDMASn 65 °C; Veeco Savannah S200", "cycles": null, "cycle_note": "TDMASn 0.8 s/N2 10 s/H2O 0.015 s/N2 10 s; 증착 후 고출력 UV 조사 5·10·15분으로 비정질 SnO2를 나노결정화(저온)", "thickness_nm": 10, "gpc_A": 0.63, "position": "ETL", "position_note": "FTO 또는 PEN/ITO 위 ETL", "device_stack": "FTO(또는 PEN/ITO)/ALD-SnO2(10 nm, UV 처리)/(MAPbI3)0.95(FAPbIBr2)0.05/… (n-i-p)", "psc": {"architecture": "n-i-p", "pce_pct": 22.86, "pce_ref_pct": null, "stability": "유연 소자 21.49%; 유연 소자 굽힘 1500회(r = 12 mm) 93.3%, 1 sun 1000 h 87.4%"}, "fe": null, "key_finding": "비정질 ALD SnO2에 강한 UV를 쬐어 저온에서 나노결정화하고 수산기를 늘려 젖음성과 전도도를 높였고, 경질 22.86%·유연 21.49%를 얻었다.", "source": {"doi": "10.1002/smsc.202500196"}, "tags": []}, {"id": "PSC-066", "field": "PSC", "material": "SnO2/ZTO 이중층", "elements": ["Sn", "Zn"], "precursors": ["TDMASn", "DEZ"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "반응기 100 °C, 매니폴드 115 °C, TDMASn 60 °C; Arradiance GEMStar-6", "cycles": null, "cycle_note": "ALD 장비에서 펄스 CVD 방식으로 증착(논문은 ALD로 대체 가능하다고 명시): SnO2 4 nm(퍼지 5 s/TDMASn 1.5 s/5 s/H2O 1 s/5 s) + ZTO 2 nm(DEZ 100 ms/5 s/H2O 1 s/5 s)", "thickness_nm": null, "gpc_A": null, "position": "buffer", "position_note": "PCBM 위, 스퍼터 ITO 아래 버퍼층", "device_stack": "SHJ 하부셀/…/CsFA perovskite/LiF(1 nm)/PCBM(10 nm)/SnO2(4 nm)/ZTO(2 nm)/ITO(150 nm)/… (단조 탠덤)", "psc": {"architecture": "tandem", "pce_pct": 23.6, "pce_ref_pct": null, "stability": "1 cm² 탠덤 NREL 인증 23.6%; 봉지 단일접합 소자 85 °C·85% RH 1000 h 시험 통과"}, "fe": null, "key_finding": "PCBM 위 SnO2/ZTO 이중 버퍼층이 스퍼터 손상을 막고 확산 장벽 역할을 해, 1 cm² 페로브스카이트/Si 탠덤 23.6%와 85 °C·85% RH 1000 h 내구성을 얻었다.", "source": {"doi": "10.1038/nenergy.2017.9"}, "tags": ["탠덤", "저온(≤100 °C)"]}, {"id": "PSC-067", "field": "PSC", "material": "ZnO/SnO2 이중층", "elements": ["Zn", "Sn"], "precursors": ["DEZ", "TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 120, "temp_note": "기판 120 °C, TDMASn 65 °C", "cycles": null, "cycle_note": "진공을 깨지 않고 ZnO 28 nm(DEZ 0.1 s/퍼지 12 s/H2O…) → SnO2 17 nm(TDMASn 0.4 s/15 s/H2O 0.2 s/15 s); 이후 200 °C 30분 열처리, UV-O3 15분", "thickness_nm": null, "gpc_A": null, "position": "ETL", "position_note": "FTO 위 ETL", "device_stack": "FTO/ALD-ZnO(28 nm)/ALD-SnO2(17 nm)/광대역 perovskite(540 nm)/Spiro-OMeTAD(200 nm)/Au(70 nm)", "psc": {"architecture": "n-i-p", "pce_pct": 18.1, "pce_ref_pct": 16.5, "stability": "기준 PCE는 ALD SnO2(17 nm) 단일층 소자; ALD ZnO 단일층 15.1%"}, "fe": null, "key_finding": "ALD ZnO–SnO2 이중층이 계단식 에너지 정렬을 만들어, 표면 패시베이션 없이 광대역 소자에서 V_OC 1.233 V와 18.1%를 얻었다.", "source": {"doi": "10.1002/solr.202201026"}, "tags": []}, {"id": "PSC-068", "field": "PSC", "material": "SnO2", "elements": ["Sn"], "precursors": ["TDMASn"], "coreactants": ["H2O"], "ald_mode": "thermal", "temp_C": 100, "temp_note": "챔버 100 °C, TDMA-Sn 50 °C; 소자용은 Oxford Instruments FlexAL", "cycles": 400, "cycle_note": "TDMA-Sn 500 ms/퍼지 5 s/H2O 50 ms/퍼지 10 s; 400사이클 ≈ 44–48 nm(c-Si 기준 예상치); 현장 FTIR로 10–200사이클 초기 성장 관찰", "thickness_nm": null, "gpc_A": null, "position": "buffer", "position_note": "C60 또는 PCBM 위 버퍼층 (C60 쪽이 우수)", "device_stack": "ITO/PTAA/perovskite/C60/ALD-SnO2/… (반투명 p-i-n)", "psc": {"architecture": "p-i-n", "pce_pct": 16.2, "pce_ref_pct": null, "stability": "PCE는 평균값; PCBM/SnO2 소자 13.2%"}, "fe": null, "key_finding": "현장 적외선 분광으로 C60과 PCBM 위 ALD SnO2의 초기 성장과 페로브스카이트 열화를 비교했고, C60/SnO2 소자가 PCBM/SnO2보다 FF가 약 10%p, V_OC가 50 mV 높았다.", "source": {"doi": "10.1021/acsami.4c09630"}, "tags": ["저온(≤100 °C)"]}, {"id": "PSC-069", "field": "PSC", "material": "NiO", "elements": ["Ni"], "precursors": [], "coreactants": [], "ald_mode": "plasma", "temp_C": null, "temp_note": null, "cycles": null, "cycle_note": null, "thickness_nm": 10, "gpc_A": null, "position": "recombination", "position_note": "CIGS 하부셀 ZnO와 PTAA 사이 (거친 CIGS 위 단락 방지)", "device_stack": "CIGS 하부셀/ZnO/PA-ALD NiO(10 nm)/PTAA/perovskite/C60/… (단조 페로브스카이트/CIGS 탠덤, 석영 봉지)", "psc": {"architecture": "tandem", "pce_pct": 18.0, "pce_ref_pct": null, "stability": "PCE는 AM1.5G 안정화 효율(AM0 15.1%); 고에너지 양성자 조사 후 초기 효율 85% 이상 유지(페로브스카이트/SHJ 탠덤은 1%로 저하)"}, "fe": null, "key_finding": "양성자 조사 뒤 페로브스카이트 서브셀은 거의 변하지 않았고, 손실은 CIGS 하부셀과 ALD NiO 재결합층(조사로 생긴 결함에 의한 PTAA/NiO 정렬 악화)에서 주로 생겼다.", "source": {"doi": "10.1016/j.joule.2020.03.006"}, "tags": ["탠덤"]}];
+
+const POS_LABEL = {
+  "passivation": "패시베이션", "ETL": "전자수송층 (ETL)", "HTL": "정공수송층 (HTL)", "buffer": "버퍼층",
+  "encapsulation": "봉지층", "recombination": "재결합층", "ferroelectric layer": "강유전층"
+};
+const POS_ORDER = ["passivation", "ETL", "HTL", "buffer", "encapsulation", "recombination", "ferroelectric layer"];
+const MODE_LABEL = { "thermal": "열", "plasma": "플라즈마", "thermal+plasma": "열+플라즈마", "spatial": "공간분할", "unknown": "미확인" };
+const FIELD_LABEL = { PSC: "태양전지", FE: "강유전체" };
+const PERIODS = [
+  [["H",1],["He",18]],
+  [["Li",1],["Be",2],["B",13],["C",14],["N",15],["O",16],["F",17],["Ne",18]],
+  [["Na",1],["Mg",2],["Al",13],["Si",14],["P",15],["S",16],["Cl",17],["Ar",18]],
+  "K Ca Sc Ti V Cr Mn Fe Co Ni Cu Zn Ga Ge As Se Br Kr".split(" ").map((s, i) => [s, i + 1]),
+  "Rb Sr Y Zr Nb Mo Tc Ru Rh Pd Ag Cd In Sn Sb Te I Xe".split(" ").map((s, i) => [s, i + 1]),
+  "Cs Ba La Hf Ta W Re Os Ir Pt Au Hg Tl Pb Bi Po At Rn".split(" ").map((s, i) => [s, i + 1]),
+];
+
+const state = { q: "", field: "all", pos: "", prec: "", co: "", mode: "", tmin: null, tmax: null,
+  els: new Set(), sort: { key: "id", dir: 1 } };
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (v, d) => (v === null || v === undefined || v === "") ? "—" : (typeof v === "number" ? (d !== undefined ? v.toFixed(d).replace(/\.0+$/, "") : String(v)) : esc(v));
+const chem = (s) => esc(s).replace(/([A-Za-z\)])(\d+(?:\.\d+)?)/g, "$1<sub>$2</sub>");
+
+function perfValue(r) {
+  if (r.field === "PSC") return r.psc && typeof r.psc.pce_pct === "number" ? r.psc.pce_pct : null;
+  return r.fe && typeof r.fe.pr2_uCcm2 === "number" ? r.fe.pr2_uCcm2 : null;
+}
+function perfText(r) {
+  if (r.field === "PSC") {
+    const p = r.psc || {};
+    if (typeof p.pce_pct !== "number") return '<span class="sub">PCE 미보고</span>';
+    const ref = typeof p.pce_ref_pct === "number" ? ` <span class="sub">대조 ${p.pce_ref_pct}%</span>` : "";
+    const tag = p.architecture === "tandem" ? ' <span class="sub">탠덤</span>' : "";
+    return `<span class="mono">PCE ${p.pce_pct}%</span>${tag}${ref}`;
+  }
+  const f = r.fe || {};
+  if (typeof f.pr2_uCcm2 === "number") return `<span class="mono">2P<sub>r</sub> ${f.pr2_uCcm2}</span> <span class="sub">μC/cm²</span>`;
+  return f.pr_note ? `<span class="sub">${esc(f.pr_note.split(/[;(]/)[0])}</span>` : '<span class="sub">—</span>';
+}
+const haystack = (r) => [r.id, r.material, r.precursors.join(" "), r.coreactants.join(" "), r.position_note, r.device_stack, r.key_finding,
+  r.source.doi, (r.tags || []).join(" "), r.cycle_note, r.temp_note].join(" ").toLowerCase();
+
+function filtered() {
+  const q = state.q.trim().toLowerCase();
+  return RECORDS.filter((r) => {
+    if (state.field !== "all" && r.field !== state.field) return false;
+    if (state.pos && r.position !== state.pos) return false;
+    if (state.prec && !r.precursors.includes(state.prec)) return false;
+    if (state.co && !r.coreactants.includes(state.co)) return false;
+    if (state.mode && r.ald_mode !== state.mode) return false;
+    for (const e of state.els) if (!(r.elements || []).includes(e)) return false;
+    if (state.tmin !== null || state.tmax !== null) {
+      if (typeof r.temp_C !== "number") return false;
+      if (state.tmin !== null && r.temp_C < state.tmin) return false;
+      if (state.tmax !== null && r.temp_C > state.tmax) return false;
+    }
+    if (q && !q.split(/\s+/).every((t) => haystack(r).includes(t))) return false;
+    return true;
+  });
+}
+
+function sortRows(rows) {
+  const { key, dir } = state.sort;
+  const val = (r) => key === "perf" ? perfValue(r)
+    : key === "id" ? (r.field === "PSC" ? "0" : "1") + r.id : r[key];
+  return rows.slice().sort((a, b) => {
+    const va = val(a), vb = val(b);
+    if (va === null || va === undefined) return 1;
+    if (vb === null || vb === undefined) return -1;
+    return (va < vb ? -1 : va > vb ? 1 : 0) * dir;
+  });
+}
+
+function renderStats() {
+  const papers = new Set(RECORDS.map((r) => r.source.doi)).size;
+  const n = (f) => RECORDS.filter(f).length;
+  const items = [
+    [RECORDS.length, "공정 레코드"], [papers, "논문"],
+    [n((r) => r.field === "PSC"), "태양전지"], [n((r) => r.field === "FE"), "강유전체"],
+    [new Set(RECORDS.flatMap((r) => r.elements || [])).size, "원소"],
+  ];
+  $("stats").innerHTML = items.map(([v, l]) => `<div class="stat"><b>${v}</b><span>${l}</span></div>`).join("");
+}
+
+function fillSelect(id, values, labelFn, allLabel) {
+  $(id).innerHTML = `<option value="">${allLabel}</option>` + values.map((v) => `<option value="${esc(v)}">${esc(labelFn ? labelFn(v) : v)}</option>`).join("");
+}
+
+function renderPeriodic(rows) {
+  const counts = {};
+  rows.forEach((r) => (r.elements || []).forEach((e) => { counts[e] = (counts[e] || 0) + 1; }));
+  const all = {};
+  RECORDS.forEach((r) => (r.elements || []).forEach((e) => { all[e] = true; }));
+  let html = "";
+  PERIODS.forEach((row, p) => {
+    const byGroup = Object.fromEntries(row.map(([s, g]) => [g, s]));
+    for (let g = 1; g <= 18; g++) {
+      const s = byGroup[g];
+      if (!s) { html += `<div aria-hidden="true"></div>`; continue; }
+      if (all[s]) {
+        const on = state.els.has(s);
+        html += `<button type="button" class="el has${on ? " on" : ""}" data-el="${s}" aria-pressed="${on}" title="${s}: ${counts[s] || 0}건">${s}<sup>${counts[s] || 0}</sup></button>`;
+      } else {
+        html += `<div class="el" aria-hidden="true">${s}</div>`;
+      }
+    }
+  });
+  $("ptable").innerHTML = html;
+}
+
+function renderChart(rows) {
+  const W = 640, rowH = 34, top = 14, left = 128, right = 18, bottom = 36;
+  const positions = POS_ORDER.filter((p) => RECORDS.some((r) => r.position === p));
+  const H = top + positions.length * rowH + bottom;
+  const xMax = 350, x = (t) => left + (t / xMax) * (W - left - right);
+  const pts = rows.filter((r) => typeof r.temp_C === "number");
+  const missing = rows.length - pts.length;
+  $("chart-note").textContent = missing ? `온도 미보고 ${missing}건은 표시 안 함` : "";
+  let s = `<svg class="strip" viewBox="0 0 ${W} ${H}" role="img" aria-label="적용 위치별 ALD 증착 온도 분포">`;
+  s += '<g class="grid tick">';
+  for (let t = 0; t <= xMax; t += 50) {
+    s += `<line x1="${x(t)}" x2="${x(t)}" y1="${top - 4}" y2="${H - bottom + 4}"/>`;
+    s += `<text x="${x(t)}" y="${H - bottom + 20}" text-anchor="middle">${t}</text>`;
+  }
+  s += `</g><text x="${W - right}" y="${H - 4}" text-anchor="end" class="sub">증착 온도 (°C)</text>`;
+  s += `<g class="ref"><line x1="${x(100)}" x2="${x(100)}" y1="${top - 4}" y2="${H - bottom + 4}"/></g>`;
+  positions.forEach((p, i) => {
+    const cy = top + i * rowH + rowH / 2;
+    s += `<text x="${left - 12}" y="${cy + 4}" text-anchor="end">${esc(POS_LABEL[p])}</text>`;
+    const here = pts.filter((r) => r.position === p).sort((a, b) => a.temp_C - b.temp_C);
+    const seen = {};
+    here.forEach((r) => {
+      const k = Math.round(r.temp_C / 6);
+      const n = seen[k] = (seen[k] || 0) + 1;
+      const dy = n === 1 ? 0 : (n % 2 === 0 ? -1 : 1) * Math.ceil((n - 1) / 2) * 8;
+      s += `<circle class="pt" cx="${x(r.temp_C)}" cy="${cy + dy}" r="5.5"/>`;
+      s += `<circle class="hit" data-id="${r.id}" cx="${x(r.temp_C)}" cy="${cy + dy}" r="11" tabindex="0" aria-label="${esc(r.id)} ${esc(r.material)} ${r.temp_C} °C"/>`;
+    });
+  });
+  s += "</svg>";
+  $("chart").innerHTML = s;
+}
+
+function renderTable(rows) {
+  $("count").textContent = `${rows.length} / ${RECORDS.length}건`;
+  $("empty").hidden = rows.length > 0;
+  $("rows").innerHTML = sortRows(rows).map((r) => `
+    <tr tabindex="0" data-id="${r.id}">
+      <td class="mono">${r.id}<br><span class="chip ${r.field === "FE" ? "fe" : ""}">${FIELD_LABEL[r.field]}</span></td>
+      <td><b>${chem(r.material)}</b>${(r.tags || []).length ? `<br><span class="sub">${esc(r.tags.join(" · "))}</span>` : ""}</td>
+      <td class="mono" style="font-size:12.5px">${esc(r.precursors.join(", ") || "—")}<br><span class="sub">${esc(r.coreactants.join(", ") || "—")}</span></td>
+      <td style="white-space:nowrap">${MODE_LABEL[r.ald_mode] || r.ald_mode}</td>
+      <td class="num mono">${fmt(r.temp_C)}${r.temp_C === null && r.temp_note ? '<br><span class="sub">비고</span>' : ""}</td>
+      <td class="num mono">${fmt(r.thickness_nm)}</td>
+      <td class="num mono">${fmt(r.gpc_A)}</td>
+      <td>${esc(POS_LABEL[r.position])}</td>
+      <td>${perfText(r)}</td>
+      <td class="doi"><a class="mono" href="https://doi.org/${esc(r.source.doi)}" target="_blank" rel="noopener">${esc(r.source.doi)}</a></td>
+    </tr>`).join("");
+  document.querySelectorAll("th[data-sort]").forEach((th) => {
+    const on = th.dataset.sort === state.sort.key;
+    th.querySelector(".arr").textContent = on ? (state.sort.dir > 0 ? "↑" : "↓") : "";
+    th.setAttribute("aria-sort", on ? (state.sort.dir > 0 ? "ascending" : "descending") : "none");
+  });
+}
+
+function render() {
+  const rows = filtered();
+  renderPeriodic(rows);
+  renderChart(rows);
+  renderTable(rows);
+}
+
+function kv(pairs) {
+  return `<dl class="kv">${pairs.filter(([, v]) => v !== undefined).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>`;
+}
+
+function openDrawer(id) {
+  const r = RECORDS.find((x) => x.id === id);
+  if (!r) return;
+  const src = r.source;
+  const perf = r.field === "PSC" ? kv([
+    ["소자 구조", fmt(r.psc && r.psc.architecture)],
+    ["PCE (ALD)", r.psc && typeof r.psc.pce_pct === "number" ? `<span class="mono">${r.psc.pce_pct}%</span>` : "—"],
+    ["PCE (대조군)", r.psc && typeof r.psc.pce_ref_pct === "number" ? `<span class="mono">${r.psc.pce_ref_pct}%</span>` : "—"],
+    ["안정성", fmt(r.psc && r.psc.stability)],
+  ]) : kv([
+    ["조성", fmt(r.fe.composition)], ["전극", fmt(r.fe.electrodes)], ["결정화 열처리", fmt(r.fe.anneal)],
+    ["2Pr", typeof r.fe.pr2_uCcm2 === "number" ? `<span class="mono">${r.fe.pr2_uCcm2} μC/cm²</span>` : "—"],
+    ["분극 비고", fmt(r.fe.pr_note)],
+    ["Ec", typeof r.fe.ec_MVcm === "number" ? `<span class="mono">${r.fe.ec_MVcm} MV/cm</span>` : "—"],
+    ["내구성", fmt(r.fe.endurance)],
+  ]);
+  $("drawer").innerHTML = `
+    <div class="drawer-top">
+      <div style="display:grid;gap:6px">
+        <span class="mono sub">${r.id} · <span class="chip ${r.field === "FE" ? "fe" : ""}">${FIELD_LABEL[r.field]}</span></span>
+        <h3 id="d-title">${chem(r.material)} · ${esc(POS_LABEL[r.position])}</h3>
+      </div>
+      <button class="btn" type="button" id="close">닫기</button>
+    </div>
+    <p class="finding">${esc(r.key_finding)}</p>
+    <section><h4>ALD 공정 조건</h4>${kv([
+      ["전구체", `<span class="mono">${esc(r.precursors.join(", ") || "—")}</span>`],
+      ["반응물", `<span class="mono">${esc(r.coreactants.join(", ") || "—")}</span>`],
+      ["방식", MODE_LABEL[r.ald_mode] || r.ald_mode],
+      ["증착 온도", typeof r.temp_C === "number" ? `<span class="mono">${r.temp_C} °C</span>` : "—"],
+      ["온도 비고", fmt(r.temp_note)],
+      ["사이클", typeof r.cycles === "number" ? `<span class="mono">${r.cycles}</span>` : "—"],
+      ["사이클·펄스 비고", fmt(r.cycle_note)],
+      ["두께", typeof r.thickness_nm === "number" ? `<span class="mono">${r.thickness_nm} nm</span>` : "—"],
+      ["GPC", typeof r.gpc_A === "number" ? `<span class="mono">${r.gpc_A} Å/cycle</span>` : "—"],
+      ["적용 계면", fmt(r.position_note)],
+      ["소자 적층", `<span class="mono" style="font-size:12.5px">${esc(r.device_stack || "—")}</span>`],
+    ])}</section>
+    <section><h4>${r.field === "PSC" ? "소자 성능" : "강유전 특성"}</h4>${perf}</section>
+    <section><h4>출처</h4>${kv([
+      ["DOI", `<a class="mono" href="https://doi.org/${esc(src.doi)}" target="_blank" rel="noopener">${esc(src.doi)}</a>`],
+    ])}</section>`;
+  $("drawer").classList.add("open");
+  $("drawer").setAttribute("aria-hidden", "false");
+  $("scrim").classList.add("open");
+  $("close").addEventListener("click", closeDrawer);
+  $("close").focus();
+}
+function closeDrawer() {
+  $("drawer").classList.remove("open");
+  $("drawer").setAttribute("aria-hidden", "true");
+  $("scrim").classList.remove("open");
+}
+
+function toCSV(rows) {
+  const cols = ["id", "field", "material", "precursors", "coreactants", "ald_mode", "temp_C", "cycles", "thickness_nm", "gpc_A",
+    "position", "position_note", "device_stack", "pce_pct", "pce_ref_pct", "stability", "pr2_uCcm2", "ec_MVcm", "anneal", "endurance",
+    "doi"];
+  const q = (v) => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const line = (r) => [r.id, r.field, r.material, r.precursors.join("; "), r.coreactants.join("; "), r.ald_mode, r.temp_C, r.cycles,
+    r.thickness_nm, r.gpc_A, r.position, r.position_note, r.device_stack, r.psc && r.psc.pce_pct, r.psc && r.psc.pce_ref_pct, r.psc && r.psc.stability,
+    r.fe && r.fe.pr2_uCcm2, r.fe && r.fe.ec_MVcm, r.fe && r.fe.anneal, r.fe && r.fe.endurance,
+    r.source.doi].map(q).join(",");
+  return [cols.join(","), ...rows.map(line)].join("\n");
+}
+function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 1800); }
+async function copy(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(`${what} ${filtered().length}건을 클립보드에 복사했다`); }
+  catch (e) { toast("복사가 막혀 있다. 브라우저에서 클립보드 권한을 허용한 뒤 다시 누른다"); }
+}
+
+function init() {
+  renderStats();
+  const uniq = (f) => [...new Set(RECORDS.flatMap(f))].sort((a, b) => a.localeCompare(b));
+  fillSelect("pos", POS_ORDER.filter((p) => RECORDS.some((r) => r.position === p)), (p) => POS_LABEL[p], "전체");
+  fillSelect("prec", uniq((r) => r.precursors), null, "전체");
+  fillSelect("co", uniq((r) => r.coreactants), null, "전체");
+  fillSelect("mode", Object.keys(MODE_LABEL).filter((m) => RECORDS.some((r) => r.ald_mode === m)), (m) => MODE_LABEL[m], "전체");
+
+  $("q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  $("field-seg").addEventListener("click", (e) => {
+    const b = e.target.closest("button"); if (!b) return;
+    state.field = b.dataset.v;
+    $("field-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    render();
+  });
+  ["pos", "prec", "co", "mode"].forEach((id) => $(id).addEventListener("change", (e) => { state[id] = e.target.value; render(); }));
+  ["tmin", "tmax"].forEach((id) => $(id).addEventListener("input", (e) => { const v = e.target.value; state[id] = v === "" ? null : Number(v); render(); }));
+  $("ptable").addEventListener("click", (e) => {
+    const b = e.target.closest("button.el"); if (!b) return;
+    const s = b.dataset.el; state.els.has(s) ? state.els.delete(s) : state.els.add(s); render();
+  });
+  $("reset").addEventListener("click", () => {
+    Object.assign(state, { q: "", field: "all", pos: "", prec: "", co: "", mode: "", tmin: null, tmax: null });
+    state.els.clear();
+    ["q", "pos", "prec", "co", "mode", "tmin", "tmax"].forEach((id) => { $(id).value = ""; });
+    $("field-seg").querySelectorAll("button").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.v === "all")));
+    render();
+  });
+  document.querySelectorAll("th[data-sort]").forEach((th) => th.addEventListener("click", () => {
+    const k = th.dataset.sort;
+    state.sort = { key: k, dir: state.sort.key === k ? -state.sort.dir : 1 };
+    renderTable(filtered());
+  }));
+  $("rows").addEventListener("click", (e) => { const tr = e.target.closest("tr"); if (tr) openDrawer(tr.dataset.id); });
+  $("rows").addEventListener("keydown", (e) => { if (e.key === "Enter") { const tr = e.target.closest("tr"); if (tr) openDrawer(tr.dataset.id); } });
+  $("scrim").addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
+  $("copy-csv").addEventListener("click", () => copy(toCSV(sortRows(filtered())), "CSV"));
+  $("copy-json").addEventListener("click", () => copy(JSON.stringify(sortRows(filtered()), null, 2), "JSON"));
+
+  const tip = $("tip"), chart = $("chart");
+  const showTip = (target) => {
+    const r = RECORDS.find((x) => x.id === target.dataset.id); if (!r) return;
+    tip.innerHTML = `<b>${esc(r.id)}</b> ${chem(r.material)}<br>${r.temp_C} °C · ${esc(r.precursors.join(", ") || "전구체 미확인")}<br><span class="mono">${esc(r.source.doi)}</span>`;
+    const box = chart.getBoundingClientRect(), c = target.getBoundingClientRect();
+    tip.style.left = `${c.left - box.left + chart.offsetLeft + 14}px`;
+    tip.style.top = `${c.top - box.top + chart.offsetTop - 8}px`;
+    tip.style.opacity = 1;
+  };
+  chart.addEventListener("mouseover", (e) => { if (e.target.classList.contains("hit")) showTip(e.target); });
+  chart.addEventListener("focusin", (e) => { if (e.target.classList.contains("hit")) showTip(e.target); });
+  chart.addEventListener("mouseout", () => { tip.style.opacity = 0; });
+  chart.addEventListener("focusout", () => { tip.style.opacity = 0; });
+  chart.addEventListener("click", (e) => { if (e.target.classList.contains("hit")) openDrawer(e.target.dataset.id); });
+  chart.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("hit")) openDrawer(e.target.dataset.id); });
+  chart.parentElement.style.position = "relative";
+  chart.parentElement.appendChild(tip);
+  render();
+}
+init();
+</script>
+</body>
+</html>
